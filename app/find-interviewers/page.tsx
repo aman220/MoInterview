@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function FindInterviewersPage() {
   return (
-    <div className="min-h-screen bg-background pt-24">
+    <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="border-b border-border py-16 px-4 sm:px-8 lg:px-12">
         <div className="max-w-6xl mx-auto space-y-6">

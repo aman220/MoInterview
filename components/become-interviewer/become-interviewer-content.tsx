@@ -111,7 +111,7 @@ export default function BecomeInterviewerContent() {
           <h1 className="text-5xl sm:text-6xl font-bold tracking-tight mb-6">
             <span className="text-foreground">Share Your Expertise,</span>
             <br />
-            <span className="bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
               Earn Competitive Rates
             </span>
           </h1>

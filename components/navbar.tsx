@@ -22,7 +22,7 @@ export default function Navbar() {
         <div className="flex justify-between items-center h-20">
           {/* Logo - Minimal */}
           <Link href="/" className="text-foreground hover:text-muted-foreground transition-smooth">
-            <span className="text-sm uppercase tracking-widest font-light">InterviewHub</span>
+            <span className="text-sm uppercase tracking-widest font-light">MoInterview</span>
           </Link>
 
           {/* Desktop Navigation */}
