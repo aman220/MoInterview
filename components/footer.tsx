@@ -46,17 +46,12 @@ export default function Footer() {
             <h3 className="font-semibold text-sm mb-4">Company</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link href="/about" className="text-muted-foreground hover:text-foreground transition-colors">
                   About
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Blog
-                </Link>
-              </li>
-              <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link href="/contact" className="text-muted-foreground hover:text-foreground transition-colors">
                   Contact
                 </Link>
               </li>
@@ -68,17 +63,17 @@ export default function Footer() {
             <h3 className="font-semibold text-sm mb-4">Legal</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link href="/privacy-policy" className="text-muted-foreground hover:text-foreground transition-colors">
                   Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link href="/terms-of-service" className="text-muted-foreground hover:text-foreground transition-colors">
                   Terms of Service
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link href="/cookie-policy" className="text-muted-foreground hover:text-foreground transition-colors">
                   Cookie Policy
                 </Link>
               </li>
