@@ -29,9 +29,5 @@ export default async function InterviewerProfilePage({ params }: PageProps) {
     notFound()
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      <InterviewerProfileContent interviewer={interviewer} />
-    </div>
-  )
+  return <InterviewerProfileContent interviewer={interviewer} />
 }

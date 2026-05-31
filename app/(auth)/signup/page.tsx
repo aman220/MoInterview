@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { Eye, EyeOff, Check } from 'lucide-react'
+import { setLazyProp } from 'next/dist/server/api-utils'
 
 export default function SignupPage() {
   const [step, setStep] = useState<'role' | 'form'>('role')
@@ -56,15 +57,16 @@ export default function SignupPage() {
     }
 
     if (passwordStrength < 3) {
-      setError('Password is not strong enough')
+      setError('P9assword is not strong enough')
       return
     }
 
     if (!formData.agree) {
-      setError('Please accept the terms and conditions')
+      setError('Please accept the terms and conditions');
+      setLazyProp
       return
     }
-
+ 
     setLoading(true)
 
     try {
@@ -119,9 +121,16 @@ export default function SignupPage() {
                   <div className="w-5 h-5 border-2 border-border rounded-full group-hover:border-accent transition-smooth"></div>
                 </div>
                 <ul className="text-xs text-muted-foreground space-y-2 font-light">
+                  <div className=''>  
+                    <span>
+                      <strong className='text-foreground'>Free for candidates</strong> - Pay only for coaching sessions    v 
+                    </span>
+f
+                  </div>
                   <li>• Find coaches from top companies</li>
                   <li>• Get expert feedback</li>
                   <li>• Track progress over time</li>
+                   
                 </ul>
               </button>
 
