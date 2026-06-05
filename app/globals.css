@@ -132,6 +132,16 @@
   }
 }
 
+/* Signup page input focus */
+.signup-input:focus {
+  border-color: var(--accent-deep) !important;
+  box-shadow: 0 0 0 3px rgba(168,123,74,0.14);
+}
+.signup-input::placeholder {
+  color: var(--muted-foreground);
+  opacity: 0.7;
+}
+
 /* Range input custom styling */
 input[type="range"].design-range {
   -webkit-appearance: none;
