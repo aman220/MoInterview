@@ -2,15 +2,23 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowLeft, ArrowRight, Mail } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Mail, Eye, EyeOff, Check } from 'lucide-react'
+import { forgotPassword, resetPassword } from '@/lib/auth'
+import { ApiError } from '@/lib/api'
 
 const AI_GRAD = 'linear-gradient(115deg, #a87b4a 0%, #c89968 30%, #bd8f9d 64%, #8e93c4 100%)'
 
+type Stage = 'request' | 'reset' | 'done'
+
 export default function ForgotPasswordPage() {
+  const [stage, setStage] = useState<Stage>('request')
   const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [sent, setSent] = useState(false)
   const [dark, setDark] = useState(false)
 
   useEffect(() => {
@@ -25,7 +33,15 @@ export default function ForgotPasswordPage() {
     try { localStorage.setItem('mo-theme', val ? 'dark' : 'light') } catch {}
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const pwReqs = [
+    { key: 'len',   label: '8+ characters', met: password.length >= 8 },
+    { key: 'upper', label: 'One uppercase', met: /[A-Z]/.test(password) },
+    { key: 'num',   label: 'One number',    met: /[0-9]/.test(password) },
+    { key: 'spec',  label: 'One symbol',    met: /[!@#$%^&*(),.?":{}|<>]/.test(password) },
+  ]
+  const pwOk = pwReqs.every(r => r.met)
+
+  const handleRequest = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     if (!email.trim()) return setError('Please enter your email address.')
@@ -33,10 +49,40 @@ export default function ForgotPasswordPage() {
 
     setLoading(true)
     try {
-      await new Promise(resolve => setTimeout(resolve, 1200))
-      setSent(true)
-    } catch {
-      setError('Something went wrong. Please try again.')
+      await forgotPassword(email.trim())
+      setStage('reset')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    if (code.trim().length !== 6) return setError('Enter the 6-digit code we sent you.')
+    if (!pwOk) return setError('Please choose a stronger password.')
+    if (password !== confirmPassword) return setError('Passwords do not match.')
+
+    setLoading(true)
+    try {
+      await resetPassword({ email: email.trim(), code: code.trim(), newPassword: password })
+      setStage('done')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResend = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      await forgotPassword(email.trim())
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -93,14 +139,14 @@ export default function ForgotPasswordPage() {
             </span>
           </h2>
           <p style={{ fontWeight: 300, fontSize: 16, color: 'rgba(250,249,247,0.72)', maxWidth: 420 }}>
-            Enter the email tied to your account and we&apos;ll send a reset link instantly. Your progress, sessions, and AI reports are all safe.
+            Enter the email tied to your account and we&apos;ll send a 6-digit reset code. Your progress, sessions, and AI reports are all safe.
           </p>
 
           {/* Steps */}
           <div style={{ marginTop: 38, display: 'flex', flexDirection: 'column', gap: 20 }}>
             {[
               { n: '01', title: 'Enter your email', desc: 'The one you used to create your account.' },
-              { n: '02', title: 'Check your inbox', desc: 'A reset link arrives within a minute.' },
+              { n: '02', title: 'Check your inbox', desc: 'A 6-digit code arrives within a minute.' },
               { n: '03', title: 'Set a new password', desc: 'Choose something strong and get back in.' },
             ].map(step => (
               <div key={step.n} style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
@@ -170,52 +216,145 @@ export default function ForgotPasswordPage() {
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px clamp(20px,3vw,40px) 48px' }}>
           <div style={{ width: '100%', maxWidth: 416 }}>
 
-            {sent ? (
-              /* ── Sent confirmation ── */
+            {/* Error */}
+            {error && stage !== 'done' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(193,75,75,0.08)', border: '1px solid rgba(193,75,75,0.3)', color: '#c14b4b', fontSize: 12.5, padding: '11px 14px', marginBottom: 18, animation: 'mo-fade 0.3s ease' }}>
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" style={{ flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+                </svg>
+                <span>{error}</span>
+              </div>
+            )}
+
+            {stage === 'done' ? (
+              /* ── Reset complete ── */
               <div style={{ animation: 'mo-fade 0.4s ease' }}>
-                {/* Icon */}
+                <div style={{ width: 64, height: 64, marginBottom: 28, borderRadius: '50%', background: '#5fae7e', display: 'grid', placeItems: 'center' }}>
+                  <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#fff" strokeWidth="2.4"><path d="M20 6L9 17l-5-5"/></svg>
+                </div>
+                <h1 style={{ fontSize: 34, fontWeight: 300, letterSpacing: '-0.025em', marginBottom: 12 }}>Password updated</h1>
+                <p style={{ fontWeight: 300, fontSize: 14.5, color: 'var(--muted-foreground)', lineHeight: 1.6, marginBottom: 32 }}>
+                  Your password has been reset. You can now sign in with your new password.
+                </p>
+                <Link href="/login"
+                  style={{ width: '100%', border: 'none', background: 'var(--foreground)', color: 'var(--background)', fontFamily: 'IBM Plex Mono, monospace', fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '0.16em', padding: 15, cursor: 'pointer', transition: 'all 0.25s', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9, textDecoration: 'none', boxSizing: 'border-box' }}
+                  className="fp-submit">
+                  <span>Continue to sign in</span>
+                  <ArrowRight size={15} strokeWidth={1.8} />
+                </Link>
+              </div>
+            ) : stage === 'reset' ? (
+              /* ── Enter code + new password ── */
+              <div style={{ animation: 'mo-fade 0.4s ease' }}>
                 <div style={{ width: 64, height: 64, marginBottom: 28, border: '1px solid var(--border)', background: 'var(--muted)', display: 'grid', placeItems: 'center', color: 'var(--accent-deep)' }}>
                   <Mail size={28} strokeWidth={1.4} />
                 </div>
 
                 <div style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.16em', color: 'var(--muted-foreground)', marginBottom: 18 }}>
-                  Check your inbox
+                  Step 02 / 02 — Reset
                 </div>
 
-                <h1 style={{ fontSize: 34, fontWeight: 300, letterSpacing: '-0.025em', marginBottom: 12 }}>Reset link sent</h1>
-                <p style={{ fontWeight: 300, fontSize: 14.5, color: 'var(--muted-foreground)', lineHeight: 1.6, marginBottom: 32 }}>
-                  We sent a password reset link to{' '}
+                <h1 style={{ fontSize: 34, fontWeight: 300, letterSpacing: '-0.025em', marginBottom: 12 }}>Enter your code</h1>
+                <p style={{ fontWeight: 300, fontSize: 14.5, color: 'var(--muted-foreground)', lineHeight: 1.6, marginBottom: 28 }}>
+                  We sent a 6-digit code to{' '}
                   <strong style={{ color: 'var(--foreground)', fontWeight: 500 }}>{email}</strong>.
-                  {' '}Check your inbox — it should arrive within a minute.
+                  {' '}Enter it below and choose a new password.
                 </p>
 
-                {/* Tip box */}
-                <div style={{ background: 'var(--muted)', border: '1px solid var(--border)', padding: '14px 16px', marginBottom: 32 }}>
-                  <div style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--muted-foreground)', marginBottom: 6 }}>
-                    Didn&apos;t receive it?
+                <form onSubmit={handleReset} noValidate>
+                  {/* Code */}
+                  <div style={{ marginBottom: 18 }}>
+                    <label htmlFor="code" style={{ display: 'block', fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--muted-foreground)', marginBottom: 8 }}>
+                      6-digit code
+                    </label>
+                    <input
+                      id="code" type="text" inputMode="numeric" maxLength={6} placeholder="000000"
+                      value={code}
+                      onChange={e => { setCode(e.target.value.replace(/\D/g, '')); setError('') }}
+                      autoFocus
+                      className="fp-input"
+                      style={{ width: '100%', padding: '13px 14px', border: '1px solid var(--border)', background: 'var(--input)', color: 'var(--foreground)', fontSize: 20, letterSpacing: '0.4em', textAlign: 'center', fontFamily: 'IBM Plex Mono, monospace', outline: 'none', transition: 'all 0.2s' }}
+                    />
                   </div>
-                  <p style={{ fontSize: 12.5, fontWeight: 300, color: 'var(--muted-foreground)', lineHeight: 1.55 }}>
-                    Check your spam folder, or make sure{' '}
-                    <strong style={{ color: 'var(--foreground)', fontWeight: 500 }}>{email}</strong>{' '}
-                    is the address you signed up with.
-                  </p>
-                </div>
 
-                {/* Resend */}
-                <button
-                  type="button"
-                  onClick={() => { setSent(false); setEmail('') }}
-                  style={{ width: '100%', border: 'none', background: 'var(--foreground)', color: 'var(--background)', fontFamily: 'IBM Plex Mono, monospace', fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '0.16em', padding: 15, cursor: 'pointer', transition: 'all 0.25s', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9, marginBottom: 16 }}
-                  className="fp-submit">
-                  <span>Try a different email</span>
-                  <ArrowRight size={15} strokeWidth={1.8} />
-                </button>
+                  {/* New password */}
+                  <div style={{ marginBottom: 18 }}>
+                    <label htmlFor="password" style={{ display: 'block', fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--muted-foreground)', marginBottom: 8 }}>
+                      New password
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        id="password" type={showPassword ? 'text' : 'password'} placeholder="••••••••"
+                        value={password}
+                        onChange={e => { setPassword(e.target.value); setError('') }}
+                        autoComplete="new-password"
+                        className="fp-input"
+                        style={{ width: '100%', padding: '13px 44px 13px 14px', border: '1px solid var(--border)', background: 'var(--input)', color: 'var(--foreground)', fontSize: 14, fontFamily: 'inherit', outline: 'none', transition: 'all 0.2s' }}
+                      />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label="Toggle password"
+                        style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)', display: 'grid', placeItems: 'center' }}>
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    {/* Requirements */}
+                    {password && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px 14px', marginTop: 12 }}>
+                        {pwReqs.map(r => (
+                          <div key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, fontWeight: 300, color: r.met ? 'var(--foreground)' : 'var(--muted-foreground)', transition: 'color 0.2s' }}>
+                            <span style={{ width: 15, height: 15, borderRadius: '50%', border: `1px solid ${r.met ? 'transparent' : 'var(--border-strong)'}`, background: r.met ? '#5fae7e' : 'transparent', display: 'grid', placeItems: 'center', flexShrink: 0, transition: 'all 0.2s' }}>
+                              {r.met && <Check size={9} color="#fff" strokeWidth={3} />}
+                            </span>
+                            {r.label}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
-                <div style={{ textAlign: 'center', paddingTop: 24, borderTop: '1px solid var(--border)', fontSize: 13, fontWeight: 300, color: 'var(--muted-foreground)' }}>
-                  Remembered it?{' '}
-                  <Link href="/login" style={{ color: 'var(--accent-deep)', textDecoration: 'none' }} className="hover:[color:var(--foreground)] transition-smooth">
-                    Back to sign in
-                  </Link>
+                  {/* Confirm password */}
+                  <div style={{ marginBottom: 26 }}>
+                    <label htmlFor="confirm" style={{ display: 'block', fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--muted-foreground)', marginBottom: 8 }}>
+                      Confirm password
+                    </label>
+                    <input
+                      id="confirm" type={showPassword ? 'text' : 'password'} placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={e => { setConfirmPassword(e.target.value); setError('') }}
+                      autoComplete="new-password"
+                      className="fp-input"
+                      style={{ width: '100%', padding: '13px 14px', border: '1px solid var(--border)', background: 'var(--input)', color: 'var(--foreground)', fontSize: 14, fontFamily: 'inherit', outline: 'none', transition: 'all 0.2s' }}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="fp-submit"
+                    style={{ width: '100%', border: 'none', background: 'var(--foreground)', color: 'var(--background)', fontFamily: 'IBM Plex Mono, monospace', fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '0.16em', padding: 15, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.45 : 1, transition: 'all 0.25s', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
+                    {loading ? (
+                      <span className="mo-spinner" />
+                    ) : (
+                      <>
+                        <span>Reset password</span>
+                        <ArrowRight size={15} strokeWidth={1.8} />
+                      </>
+                    )}
+                  </button>
+                </form>
+
+                <div style={{ textAlign: 'center', marginTop: 24, fontSize: 12.5, fontWeight: 300, color: 'var(--muted-foreground)' }}>
+                  Didn&apos;t get a code?{' '}
+                  <button type="button" onClick={handleResend} disabled={loading}
+                    style={{ background: 'none', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', color: 'var(--accent-deep)', fontSize: 12.5 }}
+                    className="hover:[color:var(--foreground)] transition-smooth">
+                    Resend
+                  </button>
+                  {' · '}
+                  <button type="button" onClick={() => { setStage('request'); setError(''); setCode('') }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-deep)', fontSize: 12.5 }}
+                    className="hover:[color:var(--foreground)] transition-smooth">
+                    Use a different email
+                  </button>
                 </div>
               </div>
             ) : (
@@ -227,26 +366,16 @@ export default function ForgotPasswordPage() {
                     Password reset
                   </span>
                   <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.16em', color: 'var(--muted-foreground)' }}>
-                    Step 01 / 01
+                    Step 01 / 02
                   </span>
                 </div>
 
                 <h1 style={{ fontSize: 34, fontWeight: 300, letterSpacing: '-0.025em', marginBottom: 8 }}>Forgot your password?</h1>
                 <p style={{ fontWeight: 300, fontSize: 14.5, color: 'var(--muted-foreground)', marginBottom: 32 }}>
-                  No problem. Enter your email and we&apos;ll send a reset link right away.
+                  No problem. Enter your email and we&apos;ll send a reset code right away.
                 </p>
 
-                {/* Error */}
-                {error && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(193,75,75,0.08)', border: '1px solid rgba(193,75,75,0.3)', color: '#c14b4b', fontSize: 12.5, padding: '11px 14px', marginBottom: 18, animation: 'mo-fade 0.3s ease' }}>
-                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" style={{ flexShrink: 0 }}>
-                      <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
-                    </svg>
-                    <span>{error}</span>
-                  </div>
-                )}
-
-                <form onSubmit={handleSubmit} noValidate>
+                <form onSubmit={handleRequest} noValidate>
                   <div style={{ marginBottom: 26 }}>
                     <label htmlFor="email" style={{ display: 'block', fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--muted-foreground)', marginBottom: 8 }}>
                       Email address
@@ -270,7 +399,7 @@ export default function ForgotPasswordPage() {
                       <span className="mo-spinner" />
                     ) : (
                       <>
-                        <span>Send reset link</span>
+                        <span>Send reset code</span>
                         <ArrowRight size={15} strokeWidth={1.8} />
                       </>
                     )}

@@ -1,8 +1,35 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ChevronRight, CheckCircle2, Mail, Loader, Trophy, Star, ArrowRight } from 'lucide-react'
+import {
+  sendOtp,
+  verifyOtp,
+  onboardInterviewer,
+  getCurrentUser,
+  getAccessToken,
+  type SpecialtyKey,
+} from '@/lib/auth'
+import { ApiError } from '@/lib/api'
+
+// UI specialty label -> backend enum key.
+const SPECIALTY_MAP: Record<string, SpecialtyKey> = {
+  'System Design': 'SYSTEM_DESIGN',
+  'Algorithms': 'ALGORITHMS',
+  'Behavioral': 'BEHAVIORAL',
+  'Front-end': 'FRONTEND',
+  'Back-end': 'BACKEND',
+  'ML/AI': 'ML_AI',
+}
+
+// UI experience band -> a representative integer the backend accepts.
+const EXPERIENCE_MAP: Record<string, number> = {
+  '0-2': 1,
+  '3-5': 4,
+  '5-10': 7,
+  '10+': 10,
+}
 
 export default function InterviewerOnboarding() {
   const [currentStep, setCurrentStep] = useState(1)
@@ -10,6 +37,7 @@ export default function InterviewerOnboarding() {
   const [profileImported, setProfileImported] = useState(false)
   const [otpVerified, setOtpVerified] = useState(false)
   const [showWelcome, setShowWelcome] = useState(false)
+  const [error, setError] = useState('')
 
   // Step 1 - Basic Information
   const [basicInfo, setBasicInfo] = useState({
@@ -33,6 +61,19 @@ export default function InterviewerOnboarding() {
   const [otp, setOtp] = useState('')
   const [otpSent, setOtpSent] = useState(false)
 
+  // Prefill from the account created during signup.
+  useEffect(() => {
+    const user = getCurrentUser()
+    if (user) {
+      setBasicInfo(prev => ({
+        ...prev,
+        firstName: prev.firstName || user.firstName,
+        lastName: prev.lastName || user.lastName,
+        email: prev.email || user.email,
+      }))
+    }
+  }, [])
+
   const handleImportLinkedIn = () => {
     setLoading(true)
     setTimeout(() => {
@@ -47,28 +88,69 @@ export default function InterviewerOnboarding() {
     }, 2000)
   }
 
-  const handleSendOtp = () => {
+  const handleSendOtp = async () => {
+    setError('')
     setLoading(true)
-    setTimeout(() => {
+    try {
+      await sendOtp(basicInfo.email.trim())
       setOtpSent(true)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not send the code. Please try again.')
+    } finally {
       setLoading(false)
-    }, 1500)
+    }
   }
 
-  const handleVerifyOtp = () => {
-    if (otp.length === 6) {
-      setLoading(true)
-      setTimeout(() => {
-        setOtpVerified(true)
-        setLoading(false)
-        setTimeout(() => setShowWelcome(true), 500)
-      }, 2000)
+  const handleResendOtp = async () => {
+    setError('')
+    try {
+      await sendOtp(basicInfo.email.trim())
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not resend the code. Please try again.')
+    }
+  }
+
+  const handleVerifyOtp = async () => {
+    if (otp.length !== 6) return
+    setError('')
+    setLoading(true)
+    try {
+      // 1. Confirm the email verification code.
+      await verifyOtp(basicInfo.email.trim(), otp)
+
+      // 2. Submit the interviewer profile with the authenticated session.
+      const token = getAccessToken()
+      if (!token) {
+        setError('Your session has expired. Please sign in again to finish onboarding.')
+        return
+      }
+      await onboardInterviewer(
+        {
+          company: companyInfo.company.trim(),
+          jobTitle: companyInfo.position.trim(),
+          roleType: companyInfo.role,
+          yearsExperience: EXPERIENCE_MAP[companyInfo.yearsExperience] ?? 0,
+          specialties: companyInfo.specialties
+            .map(s => SPECIALTY_MAP[s])
+            .filter((s): s is SpecialtyKey => Boolean(s)),
+          bio: companyInfo.bio.trim(),
+          linkedinUrl: basicInfo.linkedinUrl.trim() || undefined,
+        },
+        token,
+      )
+
+      setOtpVerified(true)
+      setTimeout(() => setShowWelcome(true), 500)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Verification failed. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
   const handleCreateMockCard = () => {
     // Navigate to dashboard or next step
-    console.log('Create mock interview card')
+    window.location.href = '/dashboard/interviewer'
   }
 
   if (showWelcome) {
@@ -182,7 +264,7 @@ export default function InterviewerOnboarding() {
               Create Interview Card
             </button>
             <Link
-              href="/interviewer-dashboard"
+              href="/dashboard/interviewer"
               className="flex-1 px-8 py-4 border border-primary text-primary font-light uppercase tracking-widest text-sm hover:bg-primary hover:text-primary-foreground transition-smooth text-center"
             >
               Go to Dashboard
@@ -213,6 +295,16 @@ export default function InterviewerOnboarding() {
             {currentStep === 3 && 'Verify Your Email'}
           </h1>
         </div>
+
+        {/* Error banner */}
+        {error && (
+          <div className="mb-8 flex items-center gap-3 border border-[rgba(193,75,75,0.3)] bg-[rgba(193,75,75,0.08)] px-4 py-3 text-sm text-[#c14b4b] animate-fade-in">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" className="flex-shrink-0">
+              <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
+            </svg>
+            <span>{error}</span>
+          </div>
+        )}
 
         {/* STEP 1 - Basic Information */}
         {currentStep === 1 && (
@@ -362,7 +454,7 @@ export default function InterviewerOnboarding() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs uppercase tracking-widest text-muted-foreground font-light">Specialties (Select Multiple)</label>
+                <label className="text-xs uppercase tracking-widest text-muted-foreground font-light">Specialties (Select at least one) *</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {['System Design', 'Algorithms', 'Behavioral', 'Front-end', 'Back-end', 'ML/AI'].map((specialty) => (
                     <button
@@ -394,7 +486,7 @@ export default function InterviewerOnboarding() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs uppercase tracking-widest text-muted-foreground font-light">Professional Bio</label>
+                <label className="text-xs uppercase tracking-widest text-muted-foreground font-light">Professional Bio * (min 20 characters)</label>
                 <textarea
                   value={companyInfo.bio}
                   onChange={(e) => setCompanyInfo({ ...companyInfo, bio: e.target.value })}
@@ -480,7 +572,7 @@ export default function InterviewerOnboarding() {
 
                 <p className="text-center text-xs text-muted-foreground font-light">
                   Didn't receive the code?{' '}
-                  <button className="text-accent hover:underline">Resend</button>
+                  <button onClick={handleResendOtp} className="text-accent hover:underline">Resend</button>
                 </p>
               </div>
             )}
@@ -505,9 +597,10 @@ export default function InterviewerOnboarding() {
             }}
             disabled={
               (currentStep === 1 && (!basicInfo.firstName || !basicInfo.lastName || !basicInfo.email)) ||
-              (currentStep === 2 && (!companyInfo.company || !companyInfo.position || !companyInfo.role || !companyInfo.yearsExperience)) ||
+              (currentStep === 2 && (!companyInfo.company || !companyInfo.position || !companyInfo.role || !companyInfo.yearsExperience || companyInfo.specialties.length === 0 || companyInfo.bio.trim().length < 20)) ||
               currentStep === 3
             }
+            onClickCapture={() => setError('')}
             className="ml-auto px-8 py-3 bg-accent text-accent-foreground font-light uppercase tracking-widest text-sm hover:bg-accent/90 disabled:opacity-50 transition-smooth flex items-center gap-2"
           >
             {currentStep === 2 ? 'Continue to Verification' : 'Next Step'}

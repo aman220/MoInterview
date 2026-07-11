@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { Eye, EyeOff, Check, ArrowRight, ArrowLeft } from 'lucide-react'
+import { register, saveSession } from '@/lib/auth'
+import { ApiError } from '@/lib/api'
 
 const AI_GRAD = 'linear-gradient(115deg, #a87b4a 0%, #c89968 30%, #bd8f9d 64%, #8e93c4 100%)'
 
@@ -74,13 +76,24 @@ export default function SignupPage() {
     }
     setLoading(true)
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      const auth = await register({
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        email: formData.email.trim(),
+        password: formData.password,
+        role: role === 'interviewer' ? 'INTERVIEWER' : 'CANDIDATE',
+      })
+      saveSession(auth)
       setSuccess(true)
       setTimeout(() => {
         window.location.href = role === 'interviewer' ? '/interviewer-onboarding' : '/dashboard'
       }, 1200)
-    } catch {
-      setError('An error occurred during signup. Please try again.')
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'An error occurred during signup. Please try again.',
+      )
     } finally {
       setLoading(false)
     }

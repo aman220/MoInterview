@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { Eye, EyeOff, ArrowRight, ArrowLeft, Check } from 'lucide-react'
+import { login, saveSession } from '@/lib/auth'
+import { ApiError } from '@/lib/api'
 
 const AI_GRAD = 'linear-gradient(115deg, #a87b4a 0%, #c89968 30%, #bd8f9d 64%, #8e93c4 100%)'
 
@@ -37,11 +39,13 @@ export default function LoginPage() {
 
     setLoading(true)
     try {
-      await new Promise(resolve => setTimeout(resolve, 1100))
+      const auth = await login({ email: email.trim(), password })
+      saveSession(auth)
       setSuccess(true)
-      setTimeout(() => { window.location.href = '/dashboard' }, 1200)
-    } catch {
-      setError('Invalid email or password. Please try again.')
+      const destination = auth.user.role === 'INTERVIEWER' ? '/dashboard/interviewer' : '/dashboard'
+      setTimeout(() => { window.location.href = destination }, 1000)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Invalid email or password. Please try again.')
     } finally {
       setLoading(false)
     }
