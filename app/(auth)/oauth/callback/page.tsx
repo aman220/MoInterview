@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getMe, saveSession } from '@/lib/auth'
+import { exchangeOAuthCode, saveSession } from '@/lib/auth'
 import { toast } from 'sonner'
 
 const AI_GRAD = 'linear-gradient(115deg, #a87b4a 0%, #c89968 30%, #bd8f9d 64%, #8e93c4 100%)'
@@ -16,33 +16,33 @@ export default function OAuthCallbackPage() {
 
   useEffect(() => {
     const run = async () => {
-      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-      const accessToken = hash.get('accessToken')
-      const refreshToken = hash.get('refreshToken')
-      const hashError = hash.get('error')
+      const params = new URLSearchParams(window.location.search)
+      const code = params.get('code')
+      const queryError = params.get('error')
 
-      // Scrub the fragment from the address bar / history immediately.
+      // Scrub the code/error from the address bar / history immediately.
       history.replaceState(null, '', window.location.pathname)
 
-      if (hashError) {
-        setError(hashError)
-        toast.error(hashError)
+      if (queryError) {
+        setError(queryError)
+        toast.error(queryError)
         setTimeout(() => { window.location.href = '/login' }, 1800)
         return
       }
-      if (!accessToken || !refreshToken) {
+      if (!code) {
         setError('Sign-in did not complete. Please try again.')
         setTimeout(() => { window.location.href = '/login' }, 1800)
         return
       }
 
       try {
-        const user = await getMe(accessToken)
-        saveSession({ accessToken, refreshToken, tokenType: 'Bearer', expiresIn: 900, user })
-        toast.success(`Welcome, ${user.firstName}!`)
+        // Redeem the one-time code for the session (refresh token set as httpOnly cookie).
+        const auth = await exchangeOAuthCode(code)
+        saveSession(auth)
+        toast.success(`Welcome, ${auth.user.firstName}!`)
         window.location.href = '/'
       } catch {
-        setError('Could not load your account. Please sign in again.')
+        setError('Could not complete sign-in. Please try again.')
         toast.error('Could not complete sign-in.')
         setTimeout(() => { window.location.href = '/login' }, 1800)
       }

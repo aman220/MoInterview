@@ -55,6 +55,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal,
+      // Send/receive the httpOnly refresh cookie on auth endpoints.
+      credentials: 'include',
     })
   } catch {
     throw new ApiError(

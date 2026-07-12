@@ -30,7 +30,8 @@ export interface UserSummary {
 
 export interface AuthResponse {
   accessToken: string
-  refreshToken: string
+  /** No longer sent to the client — the refresh token lives in an httpOnly cookie. */
+  refreshToken?: string | null
   tokenType: string
   expiresIn: number
   user: UserSummary
@@ -60,9 +61,18 @@ export interface OnboardInterviewerPayload {
 // Session storage
 // ---------------------------------------------------------------------------
 
-const ACCESS_KEY = 'mo-access-token'
-const REFRESH_KEY = 'mo-refresh-token'
 const USER_KEY = 'mo-user'
+// Legacy keys from the old localStorage-token model — cleaned up on session change.
+const LEGACY_ACCESS_KEY = 'mo-access-token'
+const LEGACY_REFRESH_KEY = 'mo-refresh-token'
+
+/**
+ * The access token is short-lived and kept only in memory — never localStorage —
+ * so an XSS payload can't read it after the fact. It's re-obtained on demand via
+ * the httpOnly refresh cookie. The (non-secret) user object stays in localStorage
+ * purely so the UI can render the logged-in state without a round-trip.
+ */
+let accessTokenInMemory: string | null = null
 
 /** Dispatched on the window whenever the session changes, so the UI can react. */
 export const AUTH_EVENT = 'mo-auth-change'
@@ -75,14 +85,23 @@ function notifyAuthChange(): void {
   }
 }
 
-export function saveSession(auth: AuthResponse): void {
+function clearLegacyTokens(): void {
   try {
-    localStorage.setItem(ACCESS_KEY, auth.accessToken)
-    localStorage.setItem(REFRESH_KEY, auth.refreshToken)
+    localStorage.removeItem(LEGACY_ACCESS_KEY)
+    localStorage.removeItem(LEGACY_REFRESH_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
+export function saveSession(auth: AuthResponse): void {
+  accessTokenInMemory = auth.accessToken
+  try {
     localStorage.setItem(USER_KEY, JSON.stringify(auth.user))
   } catch {
-    /* storage unavailable — session simply won't persist */
+    /* storage unavailable — user just won't persist across reloads */
   }
+  clearLegacyTokens()
   notifyAuthChange()
 }
 
@@ -92,19 +111,7 @@ export function dashboardPath(user: UserSummary | null): string {
 }
 
 export function getAccessToken(): string | null {
-  try {
-    return localStorage.getItem(ACCESS_KEY)
-  } catch {
-    return null
-  }
-}
-
-export function getRefreshToken(): string | null {
-  try {
-    return localStorage.getItem(REFRESH_KEY)
-  } catch {
-    return null
-  }
+  return accessTokenInMemory
 }
 
 export function getCurrentUser(): UserSummary | null {
@@ -127,28 +134,25 @@ export function saveUser(user: UserSummary): void {
 }
 
 export function clearSession(): void {
+  accessTokenInMemory = null
   try {
-    localStorage.removeItem(ACCESS_KEY)
-    localStorage.removeItem(REFRESH_KEY)
     localStorage.removeItem(USER_KEY)
   } catch {
     /* ignore */
   }
+  clearLegacyTokens()
   notifyAuthChange()
 }
 
 /**
- * Best-effort logout: revoke the refresh token on the server (ignoring errors)
- * and clear the local session.
+ * Best-effort logout: revoke the refresh token server-side (the httpOnly cookie
+ * carries it) and clear the local session.
  */
 export async function signOut(): Promise<void> {
-  const rt = getRefreshToken()
-  if (rt) {
-    try {
-      await logout(rt)
-    } catch {
-      /* token may already be expired/revoked — clear locally regardless */
-    }
+  try {
+    await logout()
+  } catch {
+    /* cookie may already be gone/expired — clear locally regardless */
   }
   clearSession()
 }
@@ -171,12 +175,18 @@ export function login(input: { email: string; password: string }): Promise<AuthR
   return request<AuthResponse>('/auth/login', { method: 'POST', body: input })
 }
 
-export function refresh(refreshToken: string): Promise<AuthResponse> {
-  return request<AuthResponse>('/auth/refresh', { method: 'POST', body: { refreshToken } })
+/** Exchanges the httpOnly refresh cookie for a fresh access token (+ rotated cookie). */
+export function refresh(): Promise<AuthResponse> {
+  return request<AuthResponse>('/auth/refresh', { method: 'POST' })
 }
 
-export function logout(refreshToken: string): Promise<void> {
-  return request<void>('/auth/logout', { method: 'POST', body: { refreshToken } })
+export function logout(): Promise<void> {
+  return request<void>('/auth/logout', { method: 'POST' })
+}
+
+/** Redeem the one-time OAuth code for a session (sets the refresh cookie). */
+export function exchangeOAuthCode(code: string): Promise<AuthResponse> {
+  return request<AuthResponse>('/oauth/exchange', { method: 'POST', body: { code } })
 }
 
 export function sendOtp(email: string): Promise<void> {
@@ -209,11 +219,7 @@ let refreshInFlight: Promise<AuthResponse> | null = null
 
 function refreshSession(): Promise<AuthResponse> {
   if (refreshInFlight) return refreshInFlight
-  const refreshToken = getRefreshToken()
-  if (!refreshToken) {
-    return Promise.reject(new ApiError('Your session has expired. Please sign in again.', 401))
-  }
-  refreshInFlight = refresh(refreshToken)
+  refreshInFlight = refresh()
     .then(auth => {
       saveSession(auth)
       return auth
@@ -263,4 +269,9 @@ export function getMe(token?: string): Promise<UserSummary> {
 
 export function onboardInterviewer(payload: OnboardInterviewerPayload): Promise<unknown> {
   return authFetch<unknown>('/interviewers/onboard', { method: 'POST', body: payload })
+}
+
+/** The interviewer's own profile. Rejects with a 404 ApiError if onboarding isn't done. */
+export function getMyInterviewerProfile(): Promise<unknown> {
+  return authFetch<unknown>('/interviewers/me/profile')
 }

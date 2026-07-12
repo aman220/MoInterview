@@ -53,9 +53,14 @@ export default function LoginPage() {
       saveSession(auth)
       setSuccess(true)
       toast.success(`Welcome back, ${auth.user.firstName}!`)
-      // Candidates must verify their email before entering the app.
-      const needsVerify = auth.user.role === 'CANDIDATE' && !auth.user.emailVerified
-      const destination = needsVerify ? '/verify-email' : '/'
+      // Candidates verify their email first; interviewers pass through onboarding,
+      // which sends them on to the dashboard if they've already completed it.
+      let destination = '/'
+      if (auth.user.role === 'CANDIDATE' && !auth.user.emailVerified) {
+        destination = '/verify-email'
+      } else if (auth.user.role === 'INTERVIEWER') {
+        destination = '/interviewer-onboarding'
+      }
       setTimeout(() => { window.location.href = destination }, 1000)
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : 'Invalid email or password. Please try again.'

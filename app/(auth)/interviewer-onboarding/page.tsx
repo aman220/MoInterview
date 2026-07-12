@@ -8,6 +8,7 @@ import {
   sendOtp,
   verifyOtp,
   onboardInterviewer,
+  getMyInterviewerProfile,
   getCurrentUser,
   oauthAuthorizeUrl,
   type SpecialtyKey,
@@ -62,6 +63,7 @@ export default function InterviewerOnboarding() {
   const [otpVerified, setOtpVerified] = useState(false)
   const [showWelcome, setShowWelcome] = useState(false)
   const [error, setError] = useState('')
+  const [ready, setReady] = useState(false)
 
   // Step 1 - Basic Information
   const [basicInfo, setBasicInfo] = useState({
@@ -85,47 +87,62 @@ export default function InterviewerOnboarding() {
   const [otp, setOtp] = useState('')
   const [otpSent, setOtpSent] = useState(false)
 
-  // Prefill from the account created during signup, and absorb any LinkedIn
-  // import payload / error the backend redirected back with.
+  // On mount: if this interviewer already finished onboarding, skip straight to the
+  // dashboard. Otherwise prefill from the session and absorb any LinkedIn import
+  // payload / error the backend redirected back with, then show the wizard.
   useEffect(() => {
-    const user = getCurrentUser()
-    if (user) {
-      setBasicInfo(prev => ({
-        ...prev,
-        firstName: prev.firstName || user.firstName,
-        lastName: prev.lastName || user.lastName,
-        email: prev.email || user.email,
-      }))
-    }
-
-    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-    const li = hash.get('li')
-    if (li) {
+    const init = async () => {
       try {
-        const p = JSON.parse(b64urlDecode(li)) as {
-          firstName?: string; lastName?: string; email?: string; avatarUrl?: string
-        }
+        await getMyInterviewerProfile()
+        // Profile exists -> already onboarded.
+        window.location.href = '/dashboard/interviewer'
+        return
+      } catch {
+        // 404 (or not authorized) -> not onboarded yet; continue with the wizard.
+      }
+
+      const user = getCurrentUser()
+      if (user) {
         setBasicInfo(prev => ({
           ...prev,
-          firstName: p.firstName || prev.firstName,
-          lastName: p.lastName || prev.lastName,
-          email: p.email || prev.email,
+          firstName: prev.firstName || user.firstName,
+          lastName: prev.lastName || user.lastName,
+          email: prev.email || user.email,
         }))
-        setProfileImported(true)
-        toast.success('LinkedIn profile imported', {
-          description: 'Name and email prefilled. Add your company details below.',
-        })
-      } catch {
-        toast.error('Could not read the imported LinkedIn profile.')
       }
-      history.replaceState(null, '', window.location.pathname)
-    }
 
-    const err = new URLSearchParams(window.location.search).get('error')
-    if (err) {
-      toast.error(err)
-      history.replaceState(null, '', window.location.pathname)
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+      const li = hash.get('li')
+      if (li) {
+        try {
+          const p = JSON.parse(b64urlDecode(li)) as {
+            firstName?: string; lastName?: string; email?: string; avatarUrl?: string
+          }
+          setBasicInfo(prev => ({
+            ...prev,
+            firstName: p.firstName || prev.firstName,
+            lastName: p.lastName || prev.lastName,
+            email: p.email || prev.email,
+          }))
+          setProfileImported(true)
+          toast.success('LinkedIn profile imported', {
+            description: 'Name and email prefilled. Add your company details below.',
+          })
+        } catch {
+          toast.error('Could not read the imported LinkedIn profile.')
+        }
+        history.replaceState(null, '', window.location.pathname)
+      }
+
+      const err = new URLSearchParams(window.location.search).get('error')
+      if (err) {
+        toast.error(err)
+        history.replaceState(null, '', window.location.pathname)
+      }
+
+      setReady(true)
     }
+    init()
   }, [])
 
   const handleImportLinkedIn = () => {
@@ -204,6 +221,12 @@ export default function InterviewerOnboarding() {
   const handleCreateMockCard = () => {
     // Navigate to dashboard or next step
     window.location.href = '/dashboard/interviewer'
+  }
+
+  // Hold the render until we've checked whether onboarding is already complete
+  // (the effect redirects already-onboarded interviewers to the dashboard).
+  if (!ready) {
+    return <div className="min-h-screen bg-background" />
   }
 
   if (showWelcome) {

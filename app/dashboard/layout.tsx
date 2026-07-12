@@ -1,14 +1,5 @@
 import React from "react"
 import type { Metadata, Viewport } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
-import { ThemeProvider } from "next-themes"
-import "../globals.css"
-import Navbar from "@/components/navbar"
-import Footer from "@/components/footer"
-
-const _geist = Geist({ subsets: ["latin"] })
-const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "MoInterview - Practice Interviews With Real Professionals",
@@ -44,27 +35,16 @@ export const viewport: Viewport = {
   ],
 }
 
-export default function RootLayout({
+// Nested layout: the root layout (app/layout.tsx) already provides <html>, <body>,
+// ThemeProvider, and Analytics. A nested layout must render only its own content.
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="font-sans antialiased bg-background text-foreground">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <div className="flex flex-col min-h-screen">
-
-            {/* Push content below navbar (64px height) */}
-            <main className="flex-grow pt-16">
-              {children}
-            </main>
-
-     
-          </div>
-        </ThemeProvider>
-        <Analytics />
-      </body>
-    </html>
+    <div className="flex flex-col min-h-screen">
+      <main className="flex-grow pt-16">{children}</main>
+    </div>
   )
 }
