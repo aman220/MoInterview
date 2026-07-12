@@ -3,15 +3,39 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ChevronRight, CheckCircle2, Mail, Loader, Trophy, Star, ArrowRight } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   sendOtp,
   verifyOtp,
   onboardInterviewer,
   getCurrentUser,
-  getAccessToken,
+  oauthAuthorizeUrl,
   type SpecialtyKey,
 } from '@/lib/auth'
 import { ApiError } from '@/lib/api'
+
+/** Decode a base64url string (no padding) to UTF-8 text. */
+function b64urlDecode(s: string): string {
+  const b64 = s.replace(/-/g, '+').replace(/_/g, '/')
+  const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4))
+  return decodeURIComponent(escape(atob(b64 + pad)))
+}
+
+/** Prepend https:// when a URL is missing its scheme (backend requires a full URL). */
+function normalizeUrl(raw: string): string {
+  const t = raw.trim()
+  if (!t) return ''
+  return /^https?:\/\//i.test(t) ? t : `https://${t}`
+}
+
+function isValidUrl(raw: string): boolean {
+  try {
+    new URL(normalizeUrl(raw))
+    return true
+  } catch {
+    return false
+  }
+}
 
 // UI specialty label -> backend enum key.
 const SPECIALTY_MAP: Record<string, SpecialtyKey> = {
@@ -61,7 +85,8 @@ export default function InterviewerOnboarding() {
   const [otp, setOtp] = useState('')
   const [otpSent, setOtpSent] = useState(false)
 
-  // Prefill from the account created during signup.
+  // Prefill from the account created during signup, and absorb any LinkedIn
+  // import payload / error the backend redirected back with.
   useEffect(() => {
     const user = getCurrentUser()
     if (user) {
@@ -72,20 +97,42 @@ export default function InterviewerOnboarding() {
         email: prev.email || user.email,
       }))
     }
+
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    const li = hash.get('li')
+    if (li) {
+      try {
+        const p = JSON.parse(b64urlDecode(li)) as {
+          firstName?: string; lastName?: string; email?: string; avatarUrl?: string
+        }
+        setBasicInfo(prev => ({
+          ...prev,
+          firstName: p.firstName || prev.firstName,
+          lastName: p.lastName || prev.lastName,
+          email: p.email || prev.email,
+        }))
+        setProfileImported(true)
+        toast.success('LinkedIn profile imported', {
+          description: 'Name and email prefilled. Add your company details below.',
+        })
+      } catch {
+        toast.error('Could not read the imported LinkedIn profile.')
+      }
+      history.replaceState(null, '', window.location.pathname)
+    }
+
+    const err = new URLSearchParams(window.location.search).get('error')
+    if (err) {
+      toast.error(err)
+      history.replaceState(null, '', window.location.pathname)
+    }
   }, [])
 
   const handleImportLinkedIn = () => {
     setLoading(true)
-    setTimeout(() => {
-      setBasicInfo({
-        firstName: 'John',
-        lastName: 'Smith',
-        email: 'john.smith@company.com',
-        linkedinUrl: 'linkedin.com/in/johnsmith'
-      })
-      setProfileImported(true)
-      setLoading(false)
-    }, 2000)
+    // Full-page redirect into the backend LinkedIn OAuth (import intent);
+    // we return to this page with the profile in the URL fragment.
+    window.location.href = oauthAuthorizeUrl('linkedin', 'import')
   }
 
   const handleSendOtp = async () => {
@@ -94,8 +141,11 @@ export default function InterviewerOnboarding() {
     try {
       await sendOtp(basicInfo.email.trim())
       setOtpSent(true)
+      toast.success('Verification code sent', { description: `Check ${basicInfo.email}` })
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not send the code. Please try again.')
+      const msg = err instanceof ApiError ? err.message : 'Could not send the code. Please try again.'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -105,8 +155,11 @@ export default function InterviewerOnboarding() {
     setError('')
     try {
       await sendOtp(basicInfo.email.trim())
+      toast.success('Code resent', { description: `A new code is on its way to ${basicInfo.email}` })
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not resend the code. Please try again.')
+      const msg = err instanceof ApiError ? err.message : 'Could not resend the code. Please try again.'
+      setError(msg)
+      toast.error(msg)
     }
   }
 
@@ -115,34 +168,34 @@ export default function InterviewerOnboarding() {
     setError('')
     setLoading(true)
     try {
-      // 1. Confirm the email verification code.
-      await verifyOtp(basicInfo.email.trim(), otp)
-
-      // 2. Submit the interviewer profile with the authenticated session.
-      const token = getAccessToken()
-      if (!token) {
-        setError('Your session has expired. Please sign in again to finish onboarding.')
-        return
+      // 1. Confirm the email verification code — but only once, since it's
+      //    single-use. If a later step fails and the user retries, we skip this
+      //    so they don't hit "No active code found".
+      if (!otpVerified) {
+        await verifyOtp(basicInfo.email.trim(), otp)
+        setOtpVerified(true)
       }
-      await onboardInterviewer(
-        {
-          company: companyInfo.company.trim(),
-          jobTitle: companyInfo.position.trim(),
-          roleType: companyInfo.role,
-          yearsExperience: EXPERIENCE_MAP[companyInfo.yearsExperience] ?? 0,
-          specialties: companyInfo.specialties
-            .map(s => SPECIALTY_MAP[s])
-            .filter((s): s is SpecialtyKey => Boolean(s)),
-          bio: companyInfo.bio.trim(),
-          linkedinUrl: basicInfo.linkedinUrl.trim() || undefined,
-        },
-        token,
-      )
 
-      setOtpVerified(true)
+      // 2. Submit the interviewer profile. authFetch auto-refreshes the access
+      //    token if it expired during this (potentially long) flow.
+      await onboardInterviewer({
+        company: companyInfo.company.trim(),
+        jobTitle: companyInfo.position.trim(),
+        roleType: companyInfo.role,
+        yearsExperience: EXPERIENCE_MAP[companyInfo.yearsExperience] ?? 0,
+        specialties: companyInfo.specialties
+          .map(s => SPECIALTY_MAP[s])
+          .filter((s): s is SpecialtyKey => Boolean(s)),
+        bio: companyInfo.bio.trim(),
+        linkedinUrl: normalizeUrl(basicInfo.linkedinUrl) || undefined,
+      })
+
+      toast.success('Email verified — profile created!')
       setTimeout(() => setShowWelcome(true), 500)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Verification failed. Please try again.')
+      const msg = err instanceof ApiError ? err.message : 'Verification failed. Please try again.'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -591,6 +644,15 @@ export default function InterviewerOnboarding() {
 
           <button
             onClick={() => {
+              setError('')
+              // Validate the (optional) LinkedIn URL before leaving step 1 —
+              // otherwise the backend rejects it much later at profile submit.
+              if (currentStep === 1 && basicInfo.linkedinUrl.trim() && !isValidUrl(basicInfo.linkedinUrl)) {
+                toast.error('That LinkedIn URL doesn’t look right', {
+                  description: 'Use a full link like https://linkedin.com/in/your-name',
+                })
+                return
+              }
               if (currentStep < 3) {
                 setCurrentStep(currentStep + 1)
               }
@@ -600,7 +662,6 @@ export default function InterviewerOnboarding() {
               (currentStep === 2 && (!companyInfo.company || !companyInfo.position || !companyInfo.role || !companyInfo.yearsExperience || companyInfo.specialties.length === 0 || companyInfo.bio.trim().length < 20)) ||
               currentStep === 3
             }
-            onClickCapture={() => setError('')}
             className="ml-auto px-8 py-3 bg-accent text-accent-foreground font-light uppercase tracking-widest text-sm hover:bg-accent/90 disabled:opacity-50 transition-smooth flex items-center gap-2"
           >
             {currentStep === 2 ? 'Continue to Verification' : 'Next Step'}

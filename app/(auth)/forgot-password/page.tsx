@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { ArrowLeft, ArrowRight, Mail, Eye, EyeOff, Check } from 'lucide-react'
 import { forgotPassword, resetPassword } from '@/lib/auth'
 import { ApiError } from '@/lib/api'
+import { toast } from 'sonner'
 
 const AI_GRAD = 'linear-gradient(115deg, #a87b4a 0%, #c89968 30%, #bd8f9d 64%, #8e93c4 100%)'
 
@@ -51,8 +52,11 @@ export default function ForgotPasswordPage() {
     try {
       await forgotPassword(email.trim())
       setStage('reset')
+      toast.success('Reset code sent', { description: `Check ${email.trim()} for your 6-digit code.` })
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.')
+      const msg = err instanceof ApiError ? err.message : 'Something went wrong. Please try again.'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -69,8 +73,11 @@ export default function ForgotPasswordPage() {
     try {
       await resetPassword({ email: email.trim(), code: code.trim(), newPassword: password })
       setStage('done')
+      toast.success('Password reset successful', { description: 'You can now sign in with your new password.' })
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.')
+      const msg = err instanceof ApiError ? err.message : 'Something went wrong. Please try again.'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -81,8 +88,11 @@ export default function ForgotPasswordPage() {
     setLoading(true)
     try {
       await forgotPassword(email.trim())
+      toast.success('Code resent', { description: `A new code is on its way to ${email.trim()}.` })
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.')
+      const msg = err instanceof ApiError ? err.message : 'Something went wrong. Please try again.'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
     }

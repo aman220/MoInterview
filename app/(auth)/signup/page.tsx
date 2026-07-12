@@ -3,8 +3,9 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { Eye, EyeOff, Check, ArrowRight, ArrowLeft } from 'lucide-react'
-import { register, saveSession } from '@/lib/auth'
+import { register, saveSession, oauthAuthorizeUrl } from '@/lib/auth'
 import { ApiError } from '@/lib/api'
+import { toast } from 'sonner'
 
 const AI_GRAD = 'linear-gradient(115deg, #a87b4a 0%, #c89968 30%, #bd8f9d 64%, #8e93c4 100%)'
 
@@ -39,20 +40,23 @@ export default function SignupPage() {
     try { localStorage.setItem('mo-theme', val ? 'dark' : 'light') } catch {}
   }
 
+  // These must match the backend's password policy exactly (RegisterRequest):
+  // 8+ chars, an uppercase letter, a number, and a symbol from the set below.
   const pwReqs = [
     { key: 'len',   label: '8+ characters',  met: formData.password.length >= 8 },
     { key: 'upper', label: 'One uppercase',   met: /[A-Z]/.test(formData.password) },
     { key: 'num',   label: 'One number',      met: /[0-9]/.test(formData.password) },
-    { key: 'spec',  label: 'One symbol',      met: /[!@#$%^&*]/.test(formData.password) },
+    { key: 'spec',  label: 'One symbol',      met: /[!@#$%^&*(),.?":{}|<>]/.test(formData.password) },
   ]
   const pwScore = pwReqs.filter(r => r.met).length
+  const pwValid = pwReqs.every(r => r.met)
   const meterColors = ['', '#c14b4b', '#c08a3e', '#c89968', '#5fae7e']
 
   const isFormValid =
     formData.firstName &&
     formData.lastName &&
     formData.email &&
-    pwScore >= 3 &&
+    pwValid &&
     formData.confirmPassword &&
     formData.agree
 
@@ -68,8 +72,8 @@ export default function SignupPage() {
     if (formData.password !== formData.confirmPassword) {
       return setError('Passwords do not match.')
     }
-    if (pwScore < 3) {
-      return setError('Please choose a stronger password.')
+    if (!pwValid) {
+      return setError('Password needs 8+ characters, an uppercase letter, a number, and a symbol.')
     }
     if (!formData.agree) {
       return setError('Please accept the terms to continue.')
@@ -85,15 +89,22 @@ export default function SignupPage() {
       })
       saveSession(auth)
       setSuccess(true)
+      if (role === 'interviewer') {
+        toast.success('Account created!', { description: "Let's set up your coach profile." })
+      } else {
+        toast.success('Account created!', { description: 'Check your email for a verification code.' })
+      }
       setTimeout(() => {
-        window.location.href = role === 'interviewer' ? '/interviewer-onboarding' : '/dashboard'
+        // Interviewers verify their email inside onboarding; candidates verify first.
+        window.location.href = role === 'interviewer' ? '/interviewer-onboarding' : '/verify-email'
       }, 1200)
     } catch (err) {
-      setError(
+      const msg =
         err instanceof ApiError
           ? err.message
-          : 'An error occurred during signup. Please try again.',
-      )
+          : 'An error occurred during signup. Please try again.'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -788,6 +799,7 @@ export default function SignupPage() {
                       {[
                         {
                           label: 'Google',
+                          provider: 'google' as const,
                           icon: (
                             <svg viewBox="0 0 24 24" width="16" height="16">
                               <path fill="#4285F4" d="M22.5 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.9a5 5 0 01-2.2 3.3v2.7h3.6c2.1-1.9 3.2-4.8 3.2-7.9z"/>
@@ -799,6 +811,7 @@ export default function SignupPage() {
                         },
                         {
                           label: 'GitHub',
+                          provider: 'github' as const,
                           icon: (
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                               <path d="M12 2C6.5 2 2 6.6 2 12.3c0 4.5 2.9 8.4 6.8 9.8.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.4-3.4-1.4-.4-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.7 1a9 9 0 014.9 0c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.3 4.7-4.6 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5 4-1.4 6.8-5.3 6.8-9.8C22 6.6 17.5 2 12 2z"/>
@@ -806,7 +819,9 @@ export default function SignupPage() {
                           ),
                         },
                       ].map(s => (
-                        <button key={s.label} type="button" style={{
+                        <button key={s.label} type="button"
+                          onClick={() => { window.location.href = oauthAuthorizeUrl(s.provider) }}
+                          style={{
                           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9,
                           border: '1px solid var(--border-strong)', background: 'var(--card)',
                           padding: 13, fontFamily: 'IBM Plex Mono, monospace', fontSize: 11,

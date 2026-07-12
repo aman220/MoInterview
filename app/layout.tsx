@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next"
 import { ThemeProvider } from "next-themes"
 import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 
 export default function RootLayout({
@@ -15,6 +16,7 @@ export default function RootLayout({
       <body className="font-sans antialiased bg-background text-foreground">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
+          <Toaster position="top-center" richColors closeButton />
         </ThemeProvider>
         <Analytics />
         <SpeedInsights />

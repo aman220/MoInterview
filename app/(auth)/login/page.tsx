@@ -3,8 +3,9 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { Eye, EyeOff, ArrowRight, ArrowLeft, Check } from 'lucide-react'
-import { login, saveSession } from '@/lib/auth'
+import { login, saveSession, oauthAuthorizeUrl } from '@/lib/auth'
 import { ApiError } from '@/lib/api'
+import { toast } from 'sonner'
 
 const AI_GRAD = 'linear-gradient(115deg, #a87b4a 0%, #c89968 30%, #bd8f9d 64%, #8e93c4 100%)'
 
@@ -23,6 +24,15 @@ export default function LoginPage() {
       const saved = localStorage.getItem('mo-theme')
       if (saved === 'dark') applyDark(true)
     } catch {}
+
+    // Surface OAuth failures redirected back as ?error=...
+    const params = new URLSearchParams(window.location.search)
+    const oauthError = params.get('error')
+    if (oauthError) {
+      setError(oauthError)
+      toast.error(oauthError)
+      history.replaceState(null, '', window.location.pathname)
+    }
   }, [])
 
   function applyDark(val: boolean) {
@@ -42,10 +52,15 @@ export default function LoginPage() {
       const auth = await login({ email: email.trim(), password })
       saveSession(auth)
       setSuccess(true)
-      const destination = auth.user.role === 'INTERVIEWER' ? '/dashboard/interviewer' : '/dashboard'
+      toast.success(`Welcome back, ${auth.user.firstName}!`)
+      // Candidates must verify their email before entering the app.
+      const needsVerify = auth.user.role === 'CANDIDATE' && !auth.user.emailVerified
+      const destination = needsVerify ? '/verify-email' : '/'
       setTimeout(() => { window.location.href = destination }, 1000)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Invalid email or password. Please try again.')
+      const msg = err instanceof ApiError ? err.message : 'Invalid email or password. Please try again.'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -182,7 +197,7 @@ export default function LoginPage() {
                 <h1 style={{ fontSize: 30, fontWeight: 300, letterSpacing: '-0.025em', marginBottom: 8 }}>You&rsquo;re in</h1>
                 <p style={{ fontWeight: 300, color: 'var(--muted-foreground)', fontSize: 14.5 }}>
                   Signed in as <strong style={{ color: 'var(--foreground)', fontWeight: 500 }}>{email}</strong>.<br />
-                  Taking you to your dashboard…
+                  Taking you home…
                 </p>
               </div>
             ) : (
@@ -302,6 +317,7 @@ export default function LoginPage() {
                   {[
                     {
                       label: 'Google',
+                      provider: 'google' as const,
                       icon: (
                         <svg viewBox="0 0 24 24" width="16" height="16">
                           <path fill="#4285F4" d="M22.5 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.9a5 5 0 01-2.2 3.3v2.7h3.6c2.1-1.9 3.2-4.8 3.2-7.9z"/>
@@ -313,6 +329,7 @@ export default function LoginPage() {
                     },
                     {
                       label: 'GitHub',
+                      provider: 'github' as const,
                       icon: (
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                           <path d="M12 2C6.5 2 2 6.6 2 12.3c0 4.5 2.9 8.4 6.8 9.8.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.4-3.4-1.4-.4-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.7 1a9 9 0 014.9 0c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.3 4.7-4.6 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5 4-1.4 6.8-5.3 6.8-9.8C22 6.6 17.5 2 12 2z"/>
@@ -321,6 +338,7 @@ export default function LoginPage() {
                     },
                   ].map(s => (
                     <button key={s.label} type="button" className="login-social"
+                      onClick={() => { window.location.href = oauthAuthorizeUrl(s.provider) }}
                       style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9, border: '1px solid var(--border-strong)', background: 'var(--card)', padding: 13, fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--foreground)', cursor: 'pointer', transition: 'all 0.2s' }}>
                       {s.icon}
                       {s.label}
