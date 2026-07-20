@@ -1,9 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { mockInterviewers } from '@/lib/mock-data'
+import { fetchInterviewerDetail, createBooking, resolveSlotDate } from '@/lib/interviewers'
+import { getCurrentUser } from '@/lib/auth'
+import { ApiError } from '@/lib/api'
+import type { Interviewer } from '@/lib/types'
 
 const companyTones: Record<string, string> = {
   Google: '#4285F4',
@@ -35,12 +38,14 @@ const FOCUS_CHIPS = ['System design', 'DSA / algorithms', 'Behavioral', 'Mock fu
 
 export default function BookingPageContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const interviewerId = searchParams.get('interviewer')
   const selectedDay = searchParams.get('day')
   const selectedTime = searchParams.get('time')
   const duration = Number(searchParams.get('duration') || '60')
 
-  const interviewer = interviewerId ? mockInterviewers.find(i => i.id === interviewerId) : null
+  const [interviewer, setInterviewer] = useState<Interviewer | null>(null)
+  const [loadingItv, setLoadingItv] = useState(true)
 
   const [notes, setNotes] = useState('')
   const [activeChips, setActiveChips] = useState<Set<string>>(new Set())
@@ -48,11 +53,39 @@ export default function BookingPageContent() {
   const [termsChecked, setTermsChecked] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
+  const [confirmedAt, setConfirmedAt] = useState<Date | null>(null)
+  const [bookError, setBookError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!interviewerId) {
+      setLoadingItv(false)
+      return
+    }
+    const controller = new AbortController()
+    fetchInterviewerDetail(interviewerId, controller.signal)
+      .then((i) => {
+        setInterviewer(i)
+        setLoadingItv(false)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setLoadingItv(false)
+      })
+    return () => controller.abort()
+  }, [interviewerId])
+
+  if (loadingItv) {
+    return (
+      <div className="text-center py-24">
+        <span className="inline-block w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--accent-deep)', borderTopColor: 'transparent' }} />
+        <p className="text-muted-foreground font-light mt-4">Loading your booking…</p>
+      </div>
+    )
+  }
 
   if (!interviewer || !selectedDay || !selectedTime) {
     return (
       <div className="text-center py-24">
-        <p className="text-muted-foreground font-light mb-4">Invalid booking parameters.</p>
+        <p className="text-muted-foreground font-light mb-4">This booking link is invalid or the coach is unavailable.</p>
         <Link href="/find-interviewers" className="text-sm uppercase tracking-[0.14em] font-light underline hover:no-underline" style={{ color: 'var(--accent-deep)' }}>
           Back to find coaches
         </Link>
@@ -76,19 +109,74 @@ export default function BookingPageContent() {
     setActiveChips(s)
   }
 
-  function handleConfirm() {
-    if (!termsChecked || processing) return
+  async function handleConfirm() {
+    if (!termsChecked || processing || !interviewer || !selectedDay || !selectedTime) return
+
+    // Must be signed in to book — send guests to login and back.
+    const user = getCurrentUser()
+    if (!user) {
+      const next = encodeURIComponent(window.location.pathname + window.location.search)
+      router.push(`/login?next=${next}`)
+      return
+    }
+
     setProcessing(true)
-    setTimeout(() => {
-      setProcessing(false)
+    setBookError(null)
+    try {
+      const when = resolveSlotDate(selectedDay, selectedTime)
+      await createBooking({
+        interviewerId: interviewer.id,
+        scheduledAt: when.toISOString(),
+        durationMinutes: duration,
+        sessionType: 'Technical',
+        focus: [...activeChips],
+        notes: notes.trim() || undefined,
+      })
+      setConfirmedAt(when)
       setConfirmed(true)
       document.body.style.overflow = 'hidden'
-    }, 1600)
+    } catch (err) {
+      setBookError(
+        err instanceof ApiError
+          ? err.message
+          : 'We couldn’t send your request. Please try again.',
+      )
+    } finally {
+      setProcessing(false)
+    }
   }
 
   function closeOverlay() {
     setConfirmed(false)
     document.body.style.overflow = ''
+  }
+
+  function addToCalendar() {
+    if (!confirmedAt || !interviewer) return
+    const start = confirmedAt
+    const end = new Date(start.getTime() + duration * 60000)
+    const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//MoInterview//Booking//EN',
+      'BEGIN:VEVENT',
+      `UID:${Date.now()}@mointerview`,
+      `DTSTAMP:${fmt(new Date())}`,
+      `DTSTART:${fmt(start)}`,
+      `DTEND:${fmt(end)}`,
+      `SUMMARY:Mock interview with ${interviewer.name}`,
+      `DESCRIPTION:${duration}-minute mock interview (pending ${interviewer.name.split(' ')[0]}'s confirmation).`,
+      'STATUS:TENTATIVE',
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n')
+    const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'mointerview-session.ics'
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -499,6 +587,11 @@ export default function BookingPageContent() {
 
               {/* CTA */}
               <div className="p-6">
+                {bookError && (
+                  <div className="mb-3 px-[14px] py-[10px] text-[12.5px] font-light border" style={{ color: 'var(--danger, #c14b4b)', borderColor: 'var(--danger, #c14b4b)', background: 'rgba(193,75,75,0.06)' }}>
+                    {bookError}
+                  </div>
+                )}
                 <button
                   onClick={handleConfirm}
                   disabled={!termsChecked || processing}
@@ -510,14 +603,14 @@ export default function BookingPageContent() {
                   {processing ? (
                     <>
                       <span className="w-[15px] h-[15px] rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                      Processing…
+                      Sending request…
                     </>
                   ) : (
                     <>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
-                        <rect x="4" y="10" width="16" height="11" rx="1.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>
+                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/>
                       </svg>
-                      Confirm &amp; pay ${total}
+                      Request this session
                     </>
                   )}
                 </button>
@@ -525,10 +618,10 @@ export default function BookingPageContent() {
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#5fae7e' }}>
                     <path d="M5 12l5 5L20 6"/>
                   </svg>
-                  Free cancellation up to 24h before
+                  You&apos;re only charged after {interviewer.name.split(' ')[0]} confirms
                 </div>
                 <p className="text-center text-[11.5px] font-light text-muted-foreground mt-[10px]">
-                  You won&apos;t be charged if {interviewer.name.split(' ')[0]} can&apos;t make it — full refund, guaranteed.
+                  We&apos;ll email you the moment {interviewer.name.split(' ')[0]} accepts — usually within a few hours.
                 </p>
               </div>
             </div>
@@ -555,11 +648,11 @@ export default function BookingPageContent() {
                   </svg>
                 </div>
               </div>
-              <h2 className="text-[28px] font-light tracking-[-0.01em]">You&apos;re booked.</h2>
+              <h2 className="text-[28px] font-light tracking-[-0.01em]">Request sent.</h2>
               <p className="text-sm font-light text-muted-foreground mt-[10px] leading-[1.5]">
-                Your mock interview with <b className="text-foreground font-medium">{interviewer.name}</b> is confirmed for{' '}
-                <b className="text-foreground font-medium">{selectedDay} at {selectedTime} PT</b>.
-                A calendar invite and video link are on the way to your inbox.
+                Your request to book <b className="text-foreground font-medium">{interviewer.name}</b> for{' '}
+                <b className="text-foreground font-medium">{selectedDay} at {selectedTime}</b> is in.
+                You&apos;ll get an email the moment {interviewer.name.split(' ')[0]} confirms.
               </p>
             </div>
             <div className="px-9 py-6">
@@ -568,9 +661,9 @@ export default function BookingPageContent() {
               </span>
               <ul className="space-y-[13px]">
                 {[
-                  'Check your email for the confirmation, calendar invite and private video link.',
-                  `${interviewer.name.split(' ')[0]} reviews your focus notes and prepares questions tailored to you.`,
-                  `Join 5 minutes early on ${selectedDay}. Afterwards, your recording, feedback and AI report land in your dashboard.`,
+                  `${interviewer.name.split(' ')[0]} reviews your request and focus notes.`,
+                  'As soon as they accept, you get a confirmation email with the calendar invite and private video link.',
+                  'Track the status anytime from your dashboard — no need to refresh your inbox.',
                 ].map((item, i) => (
                   <li key={i} className="flex gap-3 text-[13.5px] font-light leading-[1.45]">
                     <span
@@ -585,11 +678,11 @@ export default function BookingPageContent() {
               </ul>
             </div>
             <div className="px-9 pb-8 grid gap-[10px]">
-              <button className="w-full border-none cursor-pointer font-sans py-[15px] text-[12px] uppercase tracking-[0.13em] text-background transition-colors" style={{ background: 'var(--foreground)' }}>
+              <button onClick={addToCalendar} className="w-full border-none cursor-pointer font-sans py-[15px] text-[12px] uppercase tracking-[0.13em] text-background transition-colors" style={{ background: 'var(--foreground)' }}>
                 Add to calendar
               </button>
-              <Link href="/dashboard" className="w-full border cursor-pointer font-sans py-[15px] text-[12px] uppercase tracking-[0.13em] text-foreground bg-card text-center block hover:bg-muted transition-colors no-underline" style={{ borderColor: 'var(--border-strong)' }}>
-                View in dashboard
+              <Link href="/find-interviewers" className="w-full border cursor-pointer font-sans py-[15px] text-[12px] uppercase tracking-[0.13em] text-foreground bg-card text-center block hover:bg-muted transition-colors no-underline" style={{ borderColor: 'var(--border-strong)' }}>
+                Browse more coaches
               </Link>
             </div>
           </div>

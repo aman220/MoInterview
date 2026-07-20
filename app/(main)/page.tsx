@@ -117,12 +117,12 @@ export default function Home() {
       {/* Why Choose Us - Enhanced */}
       <section className="relative py-32 px-4 sm:px-8 lg:px-12 bg-linear-to-b from-muted/30 via-muted/10 to-background border-y border-border/50 overflow-hidden">
         {/* Decorative grid */}
-        <div className="absolute inset-0 bg-[linear-linear(to_right,#80808008_1px,transparent_1px),linear-linear(to_bottom,#80808008_1px,transparent_1px)] bg-[size:64px_64px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:64px_64px]" />
         
         <div className="max-w-7xl mx-auto space-y-20 relative">
           <div className="text-center space-y-6">
             <div className="inline-block px-4 py-1.5 bg-accent/10 border border-accent/20 rounded-full">
-              <p className="text-xs uppercase tracking-[0.2em] text-accent font-medium">Why InterviewHub</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-accent font-medium">Why MoInterview</p>
             </div>
             <h2 className="text-5xl sm:text-7xl font-light text-foreground tracking-tight">
               Premium Experience
@@ -203,7 +203,7 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {[
               {
-                quote: 'InterviewHub helped me crack the Google interview. The real feedback from actual Googlers was invaluable.',
+                quote: 'MoInterview helped me crack the Google interview. The real feedback from actual Googlers was invaluable.',
                 author: 'James Mitchell',
                 role: 'Software Engineer',
                 company: 'Google',

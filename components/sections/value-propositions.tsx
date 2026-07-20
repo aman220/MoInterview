@@ -59,7 +59,7 @@ export default function ValuePropositions() {
           </h2>
 
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Six key advantages that make InterviewHub the #1 platform for interview preparation
+            Six key advantages that make MoInterview the #1 platform for interview preparation
           </p>
         </div>
 

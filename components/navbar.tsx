@@ -28,6 +28,8 @@ export default function Navbar() {
     ? `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase()
     : ''
   const dashHref = dashboardPath(user)
+  // Interviewers route to the standalone coach app (external origin) → plain <a>.
+  const dashExternal = /^https?:\/\//.test(dashHref)
 
   const navLinks = [
     { label: 'Coaches', href: '/find-interviewers' },
@@ -61,7 +63,15 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
-            {hydrated && user && (
+            {hydrated && user && dashExternal && (
+              <a
+                href={dashHref}
+                className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-smooth font-light"
+              >
+                Dashboard
+              </a>
+            )}
+            {hydrated && user && !dashExternal && (
               <Link
                 href={dashHref}
                 className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-smooth font-light"
@@ -90,13 +100,23 @@ export default function Navbar() {
             {hydrated && (
               user ? (
                 <div className="hidden sm:flex items-center gap-4">
-                  <Link
-                    href={dashHref}
-                    className="h-10 px-4 text-xs uppercase tracking-widest rounded-none border border-foreground text-foreground hover:bg-foreground hover:text-background transition-smooth font-light flex items-center gap-2"
-                  >
-                    <LayoutDashboard className="w-3.5 h-3.5" />
-                    Dashboard
-                  </Link>
+                  {dashExternal ? (
+                    <a
+                      href={dashHref}
+                      className="h-10 px-4 text-xs uppercase tracking-widest rounded-none border border-foreground text-foreground hover:bg-foreground hover:text-background transition-smooth font-light flex items-center gap-2"
+                    >
+                      <LayoutDashboard className="w-3.5 h-3.5" />
+                      Dashboard
+                    </a>
+                  ) : (
+                    <Link
+                      href={dashHref}
+                      className="h-10 px-4 text-xs uppercase tracking-widest rounded-none border border-foreground text-foreground hover:bg-foreground hover:text-background transition-smooth font-light flex items-center gap-2"
+                    >
+                      <LayoutDashboard className="w-3.5 h-3.5" />
+                      Dashboard
+                    </Link>
+                  )}
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

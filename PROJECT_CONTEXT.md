@@ -1,8 +1,5 @@
 # MoInterview — Project Context (Auth + Server APIs)
-
-> Handoff doc for continuing work (next up: **interviewer dashboard**). Captures the
-> auth system, backend APIs, data/token model, security, and project conventions as of
-> the end of the auth phase. Read this first.
+     
 
 ---
 

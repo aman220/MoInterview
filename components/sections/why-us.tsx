@@ -56,7 +56,7 @@ export default function WhyUsSection() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-20 animate-fade-up">
-          <Badge className="mb-6 bg-primary/20 text-primary border-primary/50">Why InterviewHub</Badge>
+          <Badge className="mb-6 bg-primary/20 text-primary border-primary/50">Why MoInterview</Badge>
           
           <h2 className="text-5xl sm:text-6xl font-bold mb-6">
             <span className="text-foreground">The Difference</span>
@@ -67,7 +67,7 @@ export default function WhyUsSection() {
           </h2>
 
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Six reasons why top job seekers choose InterviewHub over all alternatives
+            Six reasons why top job seekers choose MoInterview over all alternatives
           </p>
         </div>
 

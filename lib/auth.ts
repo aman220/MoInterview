@@ -105,9 +105,19 @@ export function saveSession(auth: AuthResponse): void {
   notifyAuthChange()
 }
 
-/** Route a user to their role-appropriate dashboard. */
+/**
+ * Base URL of the standalone interviewer ("coach") dashboard app. Interviewers
+ * live in that app, not the main site — set NEXT_PUBLIC_COACH_APP_URL per env
+ * (defaults to the local dev port).
+ */
+export const COACH_APP_URL = process.env.NEXT_PUBLIC_COACH_APP_URL ?? 'http://localhost:3002'
+
+/**
+ * Route a user to their role-appropriate dashboard. Interviewers go to the
+ * standalone coach app (an external URL); candidates stay on the main site.
+ */
 export function dashboardPath(user: UserSummary | null): string {
-  return user?.role === 'INTERVIEWER' ? '/dashboard/interviewer' : '/dashboard'
+  return user?.role === 'INTERVIEWER' ? COACH_APP_URL : '/dashboard'
 }
 
 export function getAccessToken(): string | null {

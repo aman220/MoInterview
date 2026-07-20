@@ -55,11 +55,16 @@ export default function LoginPage() {
       toast.success(`Welcome back, ${auth.user.firstName}!`)
       // Candidates verify their email first; interviewers pass through onboarding,
       // which sends them on to the dashboard if they've already completed it.
+      // A safe `?next=` relative path (e.g. returning to a booking) wins for
+      // verified candidates.
+      const next = new URLSearchParams(window.location.search).get('next')
       let destination = '/'
       if (auth.user.role === 'CANDIDATE' && !auth.user.emailVerified) {
         destination = '/verify-email'
       } else if (auth.user.role === 'INTERVIEWER') {
         destination = '/interviewer-onboarding'
+      } else if (next && next.startsWith('/') && !next.startsWith('//')) {
+        destination = next
       }
       setTimeout(() => { window.location.href = destination }, 1000)
     } catch (err) {

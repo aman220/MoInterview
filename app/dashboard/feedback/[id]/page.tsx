@@ -8,7 +8,7 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params
   return {
-    title: 'Interview Feedback Report | InterviewHub',
+    title: 'Interview Feedback Report | MoInterview',
     description: 'Review your interview feedback, AI analysis, and performance metrics.',
   }
 }

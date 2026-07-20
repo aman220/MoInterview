@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { type Interviewer } from '@/lib/types'
+import type { InterviewerDetail } from '@/lib/interviewers'
+import { SimilarCoaches } from './similar-coaches'
 
 const companyTones: Record<string, string> = {
   Google: '#4285F4',
@@ -14,16 +15,6 @@ const companyTones: Record<string, string> = {
   Netflix: '#c14b4b',
   Stripe: '#635bff',
 }
-
-const durPrices: Record<number, number> = { 30: 60, 45: 90, 60: 120 }
-
-const mockReviews = [
-  { author: 'Emma Wilson', tone: '#0866FF', rating: 5, date: '2 weeks ago', tag: 'System Design', text: 'Excellent interviewer! Very knowledgeable and gave great feedback. Helped me prepare for my Google interview — I got the offer.' },
-  { author: 'Michael Brown', tone: '#d98a2b', rating: 5, date: '1 month ago', tag: 'DSA', text: 'Professional and thorough. Asked challenging questions that really helped me think through my approach under pressure.' },
-  { author: 'Sarah Davis', tone: '#635bff', rating: 4, date: '1 month ago', tag: 'System Design', text: 'Great session overall. Helpful feedback on communication and problem-solving approach. Would book again.' },
-]
-
-const ratingDist = [{ s: 5, p: 88 }, { s: 4, p: 9 }, { s: 3, p: 2 }, { s: 2, p: 1 }, { s: 1, p: 0 }]
 
 function initials(name: string) {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
@@ -43,7 +34,7 @@ function Stars({ rating, size = 14 }: { rating: number; size?: number }) {
 }
 
 interface InterviewerProfileContentProps {
-  interviewer: Interviewer
+  interviewer: InterviewerDetail
 }
 
 export default function InterviewerProfileContent({ interviewer }: InterviewerProfileContentProps) {
@@ -55,6 +46,11 @@ export default function InterviewerProfileContent({ interviewer }: InterviewerPr
 
   const tone = companyTones[interviewer.company] || '#8b7355'
   const price = Math.round((interviewer.pricePerSession / 60) * dur)
+  const reviews = interviewer.reviews ?? []
+  const ratingDist = (interviewer.ratingDistribution ?? []).map((b) => ({ s: b.stars, p: b.percent }))
+  const languagesText = interviewer.languages && interviewer.languages.length
+    ? interviewer.languages.join(' · ')
+    : 'English'
 
   function handleBook() {
     if (!selectedSlot) return
@@ -270,7 +266,7 @@ export default function InterviewerProfileContent({ interviewer }: InterviewerPr
                     {[
                       { v: '60 min', k: 'Typical session' },
                       { v: '~2 hrs', k: 'Avg. response' },
-                      { v: 'EN · 中文', k: 'Languages' },
+                      { v: languagesText, k: 'Languages' },
                     ].map((f, i) => (
                       <div key={i} className="bg-card p-5">
                         <div className="text-[22px] font-medium tracking-[-0.01em]">{f.v}</div>
@@ -356,58 +352,69 @@ export default function InterviewerProfileContent({ interviewer }: InterviewerPr
             {/* Reviews panel */}
             {activeTab === 'reviews' && (
               <div>
-                {/* Summary */}
-                <div className="flex gap-10 items-center p-[26px] border border-border mb-8 max-w-[640px] flex-wrap">
-                  <div className="text-center">
-                    <div className="font-light leading-none tracking-[-0.02em]" style={{ fontSize: 52 }}>
-                      {interviewer.rating}
-                    </div>
-                    <div className="mt-2">
-                      <Stars rating={interviewer.rating} />
-                    </div>
-                    <div className="text-[12px] font-light text-muted-foreground mt-2">
-                      {interviewer.reviewCount} reviews
-                    </div>
+                {reviews.length === 0 ? (
+                  <div className="max-w-[640px] py-16 text-center border border-dashed" style={{ borderColor: 'var(--border-strong)' }}>
+                    <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground block mb-3">
+                      No reviews yet
+                    </span>
+                    <h3 className="text-xl font-light mb-2">Be the first to review {interviewer.name.split(' ')[0]}</h3>
+                    <p className="font-light text-muted-foreground">
+                      Reviews appear here after candidates complete a session.
+                    </p>
                   </div>
-                  <div className="flex-1 min-w-[200px] flex flex-col gap-[7px]">
-                    {ratingDist.map(d => (
-                      <div key={d.s} className="flex items-center gap-[10px] font-mono text-[11px] text-muted-foreground">
-                        <span>{d.s}★</span>
-                        <div className="flex-1 h-[5px] overflow-hidden" style={{ background: 'var(--muted)' }}>
-                          <div style={{ width: `${d.p}%`, height: '100%', background: 'var(--accent)' }} />
+                ) : (
+                  <>
+                    {/* Summary */}
+                    <div className="flex gap-10 items-center p-[26px] border border-border mb-8 max-w-[640px] flex-wrap">
+                      <div className="text-center">
+                        <div className="font-light leading-none tracking-[-0.02em]" style={{ fontSize: 52 }}>
+                          {interviewer.rating}
                         </div>
-                        <span>{d.p}%</span>
+                        <div className="mt-2">
+                          <Stars rating={interviewer.rating} />
+                        </div>
+                        <div className="text-[12px] font-light text-muted-foreground mt-2">
+                          {interviewer.reviewCount} reviews
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                      <div className="flex-1 min-w-[200px] flex flex-col gap-[7px]">
+                        {ratingDist.map(d => (
+                          <div key={d.s} className="flex items-center gap-[10px] font-mono text-[11px] text-muted-foreground">
+                            <span>{d.s}★</span>
+                            <div className="flex-1 h-[5px] overflow-hidden" style={{ background: 'var(--muted)' }}>
+                              <div style={{ width: `${d.p}%`, height: '100%', background: 'var(--accent)' }} />
+                            </div>
+                            <span>{d.p}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
-                {/* Reviews list */}
-                <div className="max-w-[640px]">
-                  {mockReviews.map((rv, i) => (
-                    <div key={i} className="py-6 border-b border-border last:border-none">
-                      <div className="flex items-center gap-3 mb-[14px]">
-                        <div
-                          className="w-10 h-10 rounded-full grid place-items-center font-mono text-[13px] font-medium text-white flex-shrink-0"
-                          style={{ background: rv.tone }}
-                        >
-                          {initials(rv.author)}
+                    {/* Reviews list */}
+                    <div className="max-w-[640px]">
+                      {reviews.map((rv) => (
+                        <div key={rv.id} className="py-6 border-b border-border last:border-none">
+                          <div className="flex items-center gap-3 mb-[14px]">
+                            <div
+                              className="w-10 h-10 rounded-full grid place-items-center font-mono text-[13px] font-medium text-white flex-shrink-0"
+                              style={{ background: rv.tone }}
+                            >
+                              {initials(rv.name)}
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium">{rv.name}</div>
+                              <div className="text-[12px] font-light text-muted-foreground">{rv.date}</div>
+                            </div>
+                            <div className="ml-auto">
+                              <Stars rating={rv.rating} size={13} />
+                            </div>
+                          </div>
+                          <p className="text-[15px] font-light leading-[1.6]">{rv.text}</p>
                         </div>
-                        <div>
-                          <div className="text-sm font-medium">{rv.author}</div>
-                          <div className="text-[12px] font-light text-muted-foreground">{rv.date}</div>
-                        </div>
-                        <div className="ml-auto">
-                          <Stars rating={rv.rating} size={13} />
-                        </div>
-                      </div>
-                      <div className="font-mono text-[10px] uppercase tracking-[0.1em] mb-2" style={{ color: 'var(--accent-deep)' }}>
-                        {rv.tag}
-                      </div>
-                      <p className="text-[15px] font-light leading-[1.6]">{rv.text}</p>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </>
+                )}
               </div>
             )}
           </main>
@@ -519,6 +526,8 @@ export default function InterviewerProfileContent({ interviewer }: InterviewerPr
             </div>
           </aside>
         </div>
+
+        <SimilarCoaches currentId={interviewer.id} company={interviewer.company} skills={interviewer.skills} />
       </div>
     </div>
   )

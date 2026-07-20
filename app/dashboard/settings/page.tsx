@@ -2,7 +2,7 @@ import { Metadata } from 'next'
 import SettingsContent from '@/components/settings/settings-content'
 
 export const metadata: Metadata = {
-  title: 'Settings - InterviewHub',
+  title: 'Settings - MoInterview',
   description: 'Manage your account settings and preferences',
 }
 

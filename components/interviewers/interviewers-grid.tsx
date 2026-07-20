@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useMemo, useRef } from 'react'
-import { mockInterviewers } from '@/lib/mock-data'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { fetchInterviewers } from '@/lib/interviewers'
+import { ApiError } from '@/lib/api'
+import type { Interviewer } from '@/lib/types'
 import InterviewerCard from './interviewer-card'
 import InterviewerFilters, { type FilterState } from './interviewer-filters'
 
@@ -20,9 +22,39 @@ export default function InterviewersGrid() {
   const [sort, setSort] = useState('rating')
   const [drawerOpen, setDrawerOpen] = useState(false)
 
+  // Live interviewer data from the backend discovery API.
+  const [interviewers, setInterviewers] = useState<Interviewer[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback((signal?: AbortSignal) => {
+    setLoading(true)
+    setError(null)
+    fetchInterviewers(signal)
+      .then((data) => {
+        setInterviewers(data)
+        setLoading(false)
+      })
+      .catch((err) => {
+        if (signal?.aborted) return
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : 'We couldn’t load coaches right now. Please try again.',
+        )
+        setLoading(false)
+      })
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    load(controller.signal)
+    return () => controller.abort()
+  }, [load])
+
   const filtered = useMemo(() => {
     const { companies, skills, maxPrice, minExp, minRating } = filterState
-    let r = mockInterviewers.filter(i => {
+    let r = interviewers.filter(i => {
       if (companies.size && !companies.has(i.company)) return false
       if (skills.size && ![...skills].some(s => i.skills.includes(s))) return false
       if (i.pricePerSession > maxPrice) return false
@@ -41,7 +73,7 @@ export default function InterviewersGrid() {
     else if (sort === 'experience') r.sort((a, b) => b.experience - a.experience)
     else r.sort((a, b) => a.nextAvailable.getTime() - b.nextAvailable.getTime())
     return r
-  }, [search, filterState, sort])
+  }, [search, filterState, sort, interviewers])
 
   const activeCount =
     filterState.companies.size +
@@ -80,6 +112,7 @@ export default function InterviewersGrid() {
 
   const filterSidebar = (
     <InterviewerFilters
+      interviewers={interviewers}
       state={filterState}
       onCompanyToggle={companyToggle}
       onSkillToggle={skillToggle}
@@ -167,7 +200,15 @@ export default function InterviewersGrid() {
               {/* Results bar */}
               <div className="flex items-center justify-between gap-4 mb-[22px] flex-wrap">
                 <p className="text-sm font-light text-muted-foreground">
-                  <b className="text-foreground font-medium">{filtered.length}</b> coaches available
+                  {loading ? (
+                    'Loading coaches…'
+                  ) : error ? (
+                    'Coaches unavailable'
+                  ) : (
+                    <>
+                      <b className="text-foreground font-medium">{filtered.length}</b> coaches available
+                    </>
+                  )}
                 </p>
                 <div className="flex items-center gap-[14px]">
                   {/* Mobile filter button */}
@@ -235,8 +276,38 @@ export default function InterviewersGrid() {
                 </div>
               )}
 
-              {/* Grid or empty state */}
-              {filtered.length > 0 ? (
+              {/* Loading → error → no-data → no-matches → grid */}
+              {loading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-[22px]" aria-busy="true">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <SkeletonCard key={i} />
+                  ))}
+                </div>
+              ) : error ? (
+                <div className="text-center py-20 border border-dashed" style={{ borderColor: 'var(--border-strong)' }}>
+                  <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground block mb-3">
+                    Something went wrong
+                  </span>
+                  <h3 className="text-2xl font-light mb-2">Couldn’t load coaches</h3>
+                  <p className="font-light text-muted-foreground mb-[22px]">{error}</p>
+                  <button
+                    onClick={() => load()}
+                    className="bg-foreground text-background border-none cursor-pointer font-sans px-7 py-[13px] text-[11px] uppercase tracking-[0.14em] hover:bg-accent-deep transition-colors"
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : interviewers.length === 0 ? (
+                <div className="text-center py-20 border border-dashed" style={{ borderColor: 'var(--border-strong)' }}>
+                  <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground block mb-3">
+                    No coaches yet
+                  </span>
+                  <h3 className="text-2xl font-light mb-2">No coaches are available right now</h3>
+                  <p className="font-light text-muted-foreground">
+                    Check back soon — new coaches are joining every week.
+                  </p>
+                </div>
+              ) : filtered.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-[22px]">
                   {filtered.map(i => <InterviewerCard key={i.id} interviewer={i} />)}
                 </div>
@@ -284,6 +355,46 @@ export default function InterviewersGrid() {
         </div>
       </div>
     </div>
+  )
+}
+
+function SkeletonCard() {
+  return (
+    <article
+      className="bg-card border border-border flex flex-col animate-pulse"
+      style={{ boxShadow: '0 1px 2px rgba(26,20,16,0.04), 0 8px 24px -12px rgba(26,20,16,0.10)' }}
+    >
+      <div className="p-[22px] pb-[18px] flex gap-[15px]">
+        <div className="w-14 h-14 rounded-full flex-shrink-0 bg-muted" />
+        <div className="flex-1 min-w-0 space-y-2">
+          <div className="h-4 w-2/3 bg-muted rounded" />
+          <div className="h-3 w-1/2 bg-muted rounded" />
+          <div className="h-3 w-1/3 bg-muted rounded" />
+        </div>
+      </div>
+      <div className="px-[22px] pb-4 flex gap-2">
+        <div className="h-3 w-24 bg-muted rounded" />
+      </div>
+      <div className="px-[22px] pb-5 space-y-2">
+        <div className="h-3 w-full bg-muted rounded" />
+        <div className="h-3 w-4/5 bg-muted rounded" />
+      </div>
+      <div className="grid grid-cols-3 border-t border-border">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className={`py-[15px] px-2 grid place-items-center ${i < 2 ? 'border-r border-border' : ''}`}>
+            <div className="h-5 w-10 bg-muted rounded" />
+          </div>
+        ))}
+      </div>
+      <div className="px-[22px] py-[18px] flex gap-2 border-t border-border">
+        <div className="h-6 w-20 bg-muted rounded" />
+        <div className="h-6 w-16 bg-muted rounded" />
+      </div>
+      <div className="grid grid-cols-2 border-t border-border mt-auto">
+        <div className="py-4 h-11 bg-muted/40 border-r border-border" />
+        <div className="py-4 h-11 bg-muted" />
+      </div>
+    </article>
   )
 }
 

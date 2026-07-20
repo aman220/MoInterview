@@ -1,9 +1,9 @@
 'use client'
 
-import { mockInterviewers } from '@/lib/mock-data'
+import { useMemo } from 'react'
+import type { Interviewer } from '@/lib/types'
 
-const ALL_COMPANIES = [...new Set(mockInterviewers.map(i => i.company))].sort()
-const TOP_SKILLS = ['System Design', 'DSA', 'Behavioral', 'Leadership', 'PM Interview', 'JavaScript', 'Python']
+const CANDIDATE_SKILLS = ['System Design', 'DSA', 'Algorithms', 'Behavioral', 'Leadership', 'PM Interview', 'Front-end', 'Back-end', 'ML/AI', 'JavaScript', 'Python']
 const RATINGS = [0, 4.7, 4.8, 4.9]
 
 function Checkbox({
@@ -71,6 +71,8 @@ export interface FilterState {
 }
 
 interface InterviewerFiltersProps {
+  /** Live interviewer set — drives the company/skill facet options + counts. */
+  interviewers: Interviewer[]
   state: FilterState
   onCompanyToggle: (c: string, checked: boolean) => void
   onSkillToggle: (s: string, checked: boolean) => void
@@ -81,6 +83,7 @@ interface InterviewerFiltersProps {
 }
 
 export default function InterviewerFilters({
+  interviewers,
   state,
   onCompanyToggle,
   onSkillToggle,
@@ -89,6 +92,22 @@ export default function InterviewerFilters({
   onRatingChange,
   onReset,
 }: InterviewerFiltersProps) {
+  // Facets derive from the live data so options + counts stay accurate.
+  const companies = useMemo(
+    () => [...new Set(interviewers.map((i) => i.company).filter(Boolean))].sort(),
+    [interviewers],
+  )
+  const companyCount = useMemo(() => {
+    const m = new Map<string, number>()
+    interviewers.forEach((i) => m.set(i.company, (m.get(i.company) ?? 0) + 1))
+    return m
+  }, [interviewers])
+  const skills = useMemo(
+    () => CANDIDATE_SKILLS.filter((s) => interviewers.some((i) => i.skills.includes(s))),
+    [interviewers],
+  )
+  const skillCount = (sk: string) => interviewers.filter((i) => i.skills.includes(sk)).length
+
   return (
     <div>
       <div className="flex items-baseline justify-between pb-4 mb-[22px] border-b border-border">
@@ -106,11 +125,14 @@ export default function InterviewerFilters({
         <span className="block mb-[15px] font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground">
           Company
         </span>
-        {ALL_COMPANIES.map(c => (
+        {companies.length === 0 && (
+          <p className="text-[12.5px] font-light text-muted-foreground">No companies yet</p>
+        )}
+        {companies.map(c => (
           <Checkbox
             key={c}
             label={c}
-            count={mockInterviewers.filter(i => i.company === c).length}
+            count={companyCount.get(c)}
             checked={state.companies.has(c)}
             onChange={v => onCompanyToggle(c, v)}
           />
@@ -122,11 +144,14 @@ export default function InterviewerFilters({
         <span className="block mb-[15px] font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground">
           Focus area
         </span>
-        {TOP_SKILLS.filter(s => mockInterviewers.some(i => i.skills.includes(s))).map(sk => (
+        {skills.length === 0 && (
+          <p className="text-[12.5px] font-light text-muted-foreground">No focus areas yet</p>
+        )}
+        {skills.map(sk => (
           <Checkbox
             key={sk}
             label={sk}
-            count={mockInterviewers.filter(i => i.skills.includes(sk)).length}
+            count={skillCount(sk)}
             checked={state.skills.has(sk)}
             onChange={v => onSkillToggle(sk, v)}
           />

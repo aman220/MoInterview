@@ -12,7 +12,7 @@ export default function Testimonials() {
       company: 'Google',
       role: 'Software Engineer',
       avatar: 'https://avatar.vercel.sh/user?u=jamesmitchell',
-      quote: 'InterviewHub helped me crack the Google interview. The real feedback from actual Googlers was invaluable. I went from nervous to confident.',
+      quote: 'MoInterview helped me crack the Google interview. The real feedback from actual Googlers was invaluable. I went from nervous to confident.',
       rating: 5,
       result: 'Got offer at Google'
     },
@@ -48,7 +48,7 @@ export default function Testimonials() {
       company: 'Apple',
       role: 'Backend Engineer',
       avatar: 'https://avatar.vercel.sh/user?u=davidkim',
-      quote: 'InterviewHub prepared me better than any other platform. The interviewer quality and AI analysis were exceptional. Highly recommend!',
+      quote: 'MoInterview prepared me better than any other platform. The interviewer quality and AI analysis were exceptional. Highly recommend!',
       rating: 5,
       result: 'Joined Apple'
     },
@@ -76,7 +76,7 @@ export default function Testimonials() {
           </h2>
 
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            See how professionals landed their dream jobs using InterviewHub
+            See how professionals landed their dream jobs using MoInterview
           </p>
         </div>
 

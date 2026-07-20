@@ -46,6 +46,7 @@ export default function InterviewerCard({ interviewer }: InterviewerCardProps) {
   const [saved, setSaved] = useState(false)
   const tone = companyTones[interviewer.company] || '#8b7355'
   const avail = availText(interviewer.nextAvailable)
+  const hasPrice = interviewer.pricePerSession > 0
 
   return (
     <article
@@ -108,7 +109,7 @@ export default function InterviewerCard({ interviewer }: InterviewerCardProps) {
       {/* Stats */}
       <div className="grid grid-cols-3 border-t border-border">
         {[
-          { v: `$${interviewer.pricePerSession}`, unit: '/hr', k: 'Rate' },
+          { v: hasPrice ? `$${interviewer.pricePerSession}` : '—', unit: hasPrice ? '/hr' : '', k: 'Rate' },
           { v: `${interviewer.experience}`, unit: 'yrs', k: 'Experience' },
           { v: `${interviewer.reviewCount}`, unit: '', k: 'Sessions' },
         ].map((stat, i) => (
@@ -161,7 +162,11 @@ export default function InterviewerCard({ interviewer }: InterviewerCardProps) {
           className="py-4 text-center text-[11px] uppercase tracking-[0.14em] font-light text-background hover:opacity-90 transition-all duration-200 no-underline"
           style={{ background: 'var(--foreground)' }}
         >
-          Book · <span className="font-mono">${interviewer.pricePerSession}</span>
+          {hasPrice ? (
+            <>Book · <span className="font-mono">${interviewer.pricePerSession}</span></>
+          ) : (
+            'Book a session'
+          )}
         </Link>
       </div>
     </article>

@@ -11,6 +11,7 @@ import {
   getMyInterviewerProfile,
   getCurrentUser,
   oauthAuthorizeUrl,
+  COACH_APP_URL,
   type SpecialtyKey,
 } from '@/lib/auth'
 import { ApiError } from '@/lib/api'
@@ -95,7 +96,7 @@ export default function InterviewerOnboarding() {
       try {
         await getMyInterviewerProfile()
         // Profile exists -> already onboarded.
-        window.location.href = '/dashboard/interviewer'
+        window.location.href = COACH_APP_URL
         return
       } catch {
         // 404 (or not authorized) -> not onboarded yet; continue with the wizard.
@@ -220,7 +221,7 @@ export default function InterviewerOnboarding() {
 
   const handleCreateMockCard = () => {
     // Navigate to dashboard or next step
-    window.location.href = '/dashboard/interviewer'
+    window.location.href = COACH_APP_URL
   }
 
   // Hold the render until we've checked whether onboarding is already complete
@@ -340,7 +341,7 @@ export default function InterviewerOnboarding() {
               Create Interview Card
             </button>
             <Link
-              href="/dashboard/interviewer"
+              href={COACH_APP_URL}
               className="flex-1 px-8 py-4 border border-primary text-primary font-light uppercase tracking-widest text-sm hover:bg-primary hover:text-primary-foreground transition-smooth text-center"
             >
               Go to Dashboard

@@ -153,7 +153,7 @@ export default function BecomeInterviewerContent() {
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-transparent to-muted/30">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16 animate-fade-up">
-            <h2 className="text-4xl font-bold mb-4">Why Join InterviewHub?</h2>
+            <h2 className="text-4xl font-bold mb-4">Why Join MoInterview?</h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Enjoy flexibility, competitive rates, and the satisfaction of mentoring professionals
             </p>
@@ -270,7 +270,7 @@ export default function BecomeInterviewerContent() {
 
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">Ready to Earn While Helping Others?</h2>
             <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Join thousands of professionals already making a difference and earning great income on InterviewHub
+              Join thousands of professionals already making a difference and earning great income on MoInterview
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">

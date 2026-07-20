@@ -46,17 +46,17 @@ export default function Footer() {
             <h3 className="font-semibold text-sm mb-4">Company</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link href="/about" className="text-muted-foreground hover:text-foreground transition-colors">
                   About
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link href="/blog" className="text-muted-foreground hover:text-foreground transition-colors">
                   Blog
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link href="/contact" className="text-muted-foreground hover:text-foreground transition-colors">
                   Contact
                 </Link>
               </li>
@@ -68,17 +68,17 @@ export default function Footer() {
             <h3 className="font-semibold text-sm mb-4">Legal</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link href="/privacy" className="text-muted-foreground hover:text-foreground transition-colors">
                   Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link href="/terms" className="text-muted-foreground hover:text-foreground transition-colors">
                   Terms of Service
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link href="/cookies" className="text-muted-foreground hover:text-foreground transition-colors">
                   Cookie Policy
                 </Link>
               </li>
@@ -89,18 +89,18 @@ export default function Footer() {
         {/* Divider */}
         <div className="border-t border-border pt-8 flex flex-col md:flex-row justify-between items-center">
           <p className="text-sm text-muted-foreground mb-4 md:mb-0">
-            © 2024 MoInterview. All rights reserved.
+            © {new Date().getFullYear()} MoInterview. All rights reserved.
           </p>
           <div className="flex space-x-4">
-            <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+            <a href="https://twitter.com/mointerview" target="_blank" rel="noopener noreferrer" aria-label="MoInterview on Twitter" className="text-muted-foreground hover:text-foreground transition-colors">
               <Twitter className="w-5 h-5" />
-            </Link>
-            <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+            </a>
+            <a href="https://www.linkedin.com/company/mointerview" target="_blank" rel="noopener noreferrer" aria-label="MoInterview on LinkedIn" className="text-muted-foreground hover:text-foreground transition-colors">
               <Linkedin className="w-5 h-5" />
-            </Link>
-            <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+            </a>
+            <a href="https://github.com/mointerview" target="_blank" rel="noopener noreferrer" aria-label="MoInterview on GitHub" className="text-muted-foreground hover:text-foreground transition-colors">
               <Github className="w-5 h-5" />
-            </Link>
+            </a>
           </div>
         </div>
       </div>
